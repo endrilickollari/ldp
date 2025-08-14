@@ -1,0 +1,23 @@
+# Web Framework & Server
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Asynchronous Task Queue
+celery
+redis
+
+# Data Parsing & OCR
+pandas
+openpyxl
+pdfplumber
+pytesseract
+Pillow
+
+# LLM Client
+google-generativeai
+
+# Configuration & Utilities
+pydantic-settings
+python-dotenv
+jsonschema
