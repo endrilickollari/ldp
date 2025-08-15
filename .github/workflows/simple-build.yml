@@ -34,6 +34,8 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install flower
+        pip install pytest httpx
+        pip install pytest-asyncio
 
     - name: Run tests
       run: python -m pytest tests/ -v --tb=short
