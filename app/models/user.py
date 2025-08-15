@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Float, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Float, ForeignKey, Enum, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -10,6 +10,25 @@ class PlanType(str, PyEnum):
     PREMIUM = "premium" 
     EXTRA_PREMIUM = "extra_premium"
 
+class UserType(str, PyEnum):
+    SOLO = "solo"
+    ENTERPRISE = "enterprise"
+
+class Company(Base):
+    __tablename__ = "companies"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, index=True)
+    domain = Column(String, unique=True, index=True, nullable=False)  # Company email domain
+    description = Column(Text, nullable=True)
+    website = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    users = relationship("User", back_populates="company")
+
 class User(Base):
     __tablename__ = "users"
     
@@ -20,11 +39,14 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
+    user_type = Column(Enum(UserType), default=UserType.SOLO)
     plan_type = Column(Enum(PlanType), default=PlanType.FREE)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Relationships
+    company = relationship("Company", back_populates="users")
     api_keys = relationship("APIKey", back_populates="user", cascade="all, delete-orphan")
     usage_logs = relationship("UsageLog", back_populates="user", cascade="all, delete-orphan")
     

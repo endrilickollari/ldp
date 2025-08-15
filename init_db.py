@@ -4,7 +4,7 @@ Run this to create all tables and seed initial data
 """
 
 from app.database import engine, Base
-from app.models.user import User, APIKey, PlanLimits, UsageLog
+from app.models.user import User, APIKey, PlanLimits, UsageLog, Company
 from sqlalchemy.orm import sessionmaker
 from app.models.user import PlanType
 

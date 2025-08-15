@@ -77,7 +77,7 @@ async def create_job(
         raise HTTPException(status_code=500, detail=f"Failed to process file: {e}")
 
     status_url = str(request.url_for("get_job_status", job_id=str(job_id)))
-    return {"job_id": job_id, "status": "queued", "status_url": status_url}
+    return {"job_id": str(job_id), "status": "queued", "status_url": status_url}
 
 @router.get("/jobs/{job_id}", response_model=JobStatusResponse)
 def get_job_status(
@@ -87,6 +87,16 @@ def get_job_status(
 ):
     """Get job status (requires authentication)"""
     user, api_key = auth_data
+    
+    # Validate job_id is a valid UUID
+    try:
+        uuid.UUID(job_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid job ID format"
+        )
+    
     task_result = AsyncResult(job_id, app=celery_app)
     
     # Update API key last used timestamp
@@ -95,7 +105,7 @@ def get_job_status(
         db.commit()
     
     response_data = {
-        "job_id": uuid.UUID(job_id),
+        "job_id": job_id,  # Return as string instead of UUID
         "status": task_result.status,
     }
 

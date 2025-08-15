@@ -10,56 +10,49 @@ from typing import Dict, Any
 router = APIRouter()
 
 @router.get("/plans", response_model=Dict[str, Any])
-def get_available_plans():
+def get_available_plans(current_user: User = Depends(get_current_active_user)):
     """Get all available plans with their features and pricing"""
+    
+    # Get base plan configurations
+    free_limits = UserService.get_plan_limits(PlanType.FREE, current_user.user_type)  # type: ignore
+    premium_limits = UserService.get_plan_limits(PlanType.PREMIUM, current_user.user_type)  # type: ignore
+    extra_premium_limits = UserService.get_plan_limits(PlanType.EXTRA_PREMIUM, current_user.user_type)  # type: ignore
+    
+    user_type_suffix = " (Enterprise Enhanced)" if current_user.user_type.value == "enterprise" else ""  # type: ignore
+    
     return {
         "free": {
-            "name": "Free Plan",
-            "monthly_documents": 10,
-            "max_file_size_mb": 5.0,
-            "priority_processing": False,
-            "support_level": "Community",
-            "price_usd": 0.0,
-            "tokens_per_month": 50000,
+            "name": f"Free Plan{user_type_suffix}",
+            **free_limits,
             "features": [
-                "10 documents per month",
-                "5MB max file size",
+                f"{free_limits['monthly_documents']} documents per month",
+                f"{free_limits['max_file_size_mb']}MB max file size",
                 "Community support",
                 "Standard processing speed",
                 "Basic document types (PDF, Excel, Images)"
             ]
         },
         "premium": {
-            "name": "Premium Plan", 
-            "monthly_documents": 100,
-            "max_file_size_mb": 25.0,
-            "priority_processing": True,
-            "support_level": "Email Support",
-            "price_usd": 29.99,
-            "tokens_per_month": 500000,
+            "name": f"Premium Plan{user_type_suffix}", 
+            **premium_limits,
             "features": [
-                "100 documents per month",
-                "25MB max file size", 
+                f"{premium_limits['monthly_documents']} documents per month",
+                f"{premium_limits['max_file_size_mb']}MB max file size", 
                 "Priority processing queue",
-                "Email support",
+                premium_limits['support_level'],
                 "All document types supported",
                 "Advanced AI analysis",
                 "API access"
             ]
         },
         "extra_premium": {
-            "name": "Extra Premium Plan",
-            "monthly_documents": 500,
-            "max_file_size_mb": 100.0,
-            "priority_processing": True,
-            "support_level": "Priority Support + Phone",
-            "price_usd": 99.99,
-            "tokens_per_month": 2000000,
+            "name": f"Extra Premium Plan{user_type_suffix}",
+            **extra_premium_limits,
             "features": [
-                "500 documents per month",
-                "100MB max file size",
+                f"{extra_premium_limits['monthly_documents']} documents per month",
+                f"{extra_premium_limits['max_file_size_mb']}MB max file size",
                 "Highest priority processing",
-                "Phone + Email support", 
+                extra_premium_limits['support_level'],
                 "All document types supported",
                 "Advanced AI analysis",
                 "Full API access",
@@ -85,10 +78,11 @@ def get_current_plan(
 ):
     """Get current user's plan details"""
     user_service = UserService(db)
-    plan_limits = user_service.get_plan_limits(current_user.plan_type)  # type: ignore
+    plan_limits = UserService.get_plan_limits(current_user.plan_type, current_user.user_type)  # type: ignore
     usage_stats = user_service.get_usage_stats(current_user)
     
     return {
+        "user_type": current_user.user_type.value,  # type: ignore
         "current_plan": current_user.plan_type.value,
         "plan_details": plan_limits,
         "usage": usage_stats

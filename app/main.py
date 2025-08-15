@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import jobs, auth, plans
+from app.api import jobs, auth, plans, companies
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -23,6 +23,7 @@ app.add_middleware(
 # Include routers
 app.include_router(auth.router, prefix="/v1/auth", tags=["Authentication"])
 app.include_router(plans.router, prefix="/v1/plans", tags=["Plans & Usage"])
+app.include_router(companies.router, prefix="/v1/companies", tags=["Companies"])
 app.include_router(jobs.router, prefix="/v1", tags=["Jobs"])
 
 @app.get("/")
@@ -41,11 +42,16 @@ def read_root():
             "register": "/v1/auth/register",
             "login": "/v1/auth/login",
             "profile": "/v1/auth/me",
+            "company": "/v1/auth/company",
             "api_keys": "/v1/auth/api-keys"
         },
         "plan_endpoints": {
             "available_plans": "/v1/plans/plans",
             "current_plan": "/v1/plans/current-plan",
             "usage_stats": "/v1/plans/usage"
+        },
+        "company_endpoints": {
+            "company_users": "/v1/companies/users",
+            "company_info": "/v1/companies/{company_id}"
         }
     }

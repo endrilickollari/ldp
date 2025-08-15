@@ -13,3 +13,4 @@ __pycache__/
 
 
 app.db
+server.log

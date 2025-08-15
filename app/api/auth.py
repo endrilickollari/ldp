@@ -5,8 +5,8 @@ from datetime import timedelta
 from app.database import get_db
 from app.core.auth import verify_password, get_password_hash, create_access_token
 from app.core.dependencies import get_current_active_user, generate_api_key
-from app.models.user import User, APIKey, PlanType
-from app.schemas.user import UserCreate, User as UserSchema, Token, APIKeyCreate, APIKey as APIKeySchema
+from app.models.user import User, APIKey, PlanType, Company, UserType
+from app.schemas.user import UserCreate, User as UserSchema, Token, APIKeyCreate, APIKey as APIKeySchema, Company as CompanySchema
 from app.core.config import settings
 from typing import List
 
@@ -31,6 +31,25 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
             detail="Username already taken"
         )
     
+    company_id = None
+    
+    # Handle enterprise user registration
+    if user_data.user_type == UserType.ENTERPRISE:
+        # Check if company already exists
+        company = db.query(Company).filter(Company.domain == user_data.company_domain).first()
+        if not company:
+            # Create new company
+            company = Company(
+                name=user_data.company_name,
+                domain=user_data.company_domain,
+                is_active=True
+            )
+            db.add(company)
+            db.commit()
+            db.refresh(company)
+        
+        company_id = company.id
+    
     # Create new user
     hashed_password = get_password_hash(user_data.password)
     db_user = User(
@@ -38,7 +57,9 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
         username=user_data.username,
         full_name=user_data.full_name,
         hashed_password=hashed_password,
-        plan_type=PlanType.FREE
+        user_type=user_data.user_type,
+        plan_type=PlanType.FREE,
+        company_id=company_id
     )
     
     db.add(db_user)
@@ -72,7 +93,12 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     # Create access token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": str(user.email), "user_id": user.id, "plan_type": user.plan_type.value},  # type: ignore
+        data={
+            "sub": str(user.email), 
+            "user_id": user.id, 
+            "plan_type": user.plan_type.value,
+            "user_type": user.user_type.value
+        },
         expires_delta=access_token_expires
     )
     
@@ -87,6 +113,27 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 def get_current_user_info(current_user: User = Depends(get_current_active_user)):
     """Get current user information"""
     return current_user
+
+@router.get("/company", response_model=CompanySchema)
+def get_user_company(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get company information for enterprise users"""
+    if current_user.user_type != UserType.ENTERPRISE or current_user.company_id is None:  # type: ignore
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User is not associated with a company"
+        )
+    
+    company = db.query(Company).filter(Company.id == current_user.company_id).first()  # type: ignore
+    if not company:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Company not found"
+        )
+    
+    return company
 
 @router.post("/api-keys", response_model=APIKeySchema)
 def create_api_key(

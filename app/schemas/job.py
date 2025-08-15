@@ -1,20 +1,24 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Any
 import uuid
 
 # --- API Schemas ---
 
 class JobCreateResponse(BaseModel):
-    job_id: uuid.UUID
+    job_id: str  # Changed from uuid.UUID to str
     status: str
     status_url: str
 
 class JobStatusResponse(BaseModel):
-    job_id: uuid.UUID
+    job_id: str  # Changed from uuid.UUID to str
     status: str
     stage: Optional[str] = None
     progress: Optional[int] = None
-    result: Optional[dict] = None
+    result: Optional[Any] = None  # Changed to Any to handle strings and dicts
+    
+    # Allow extra fields for dynamic content
+    class Config:
+        extra = "allow"
 
 # --- LLM Output Schema ---
 
