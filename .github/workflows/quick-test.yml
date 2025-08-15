@@ -28,12 +28,13 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install pytest
 
     - name: Run quick tests
       run: |
         mkdir -p uploads logs
         python init_db.py
-        python -m pytest tests/ -v --tb=short -x
+        python -m pytest tests/ -v --tb=short -x --maxfail=1
       env:
         PYTHONPATH: ${{ github.workspace }}
 

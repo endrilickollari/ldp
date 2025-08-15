@@ -41,7 +41,7 @@ jobs:
           libgomp1
 
     - name: Cache pip dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
@@ -190,7 +190,7 @@ jobs:
         fi
 
     - name: Upload build artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ldp-app-build-${{ github.run_number }}
         path: build/ldp-app-${{ github.run_number }}.zip
@@ -198,7 +198,7 @@ jobs:
 
     - name: Upload latest build (main branch only)
       if: github.ref == 'refs/heads/main'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ldp-app-latest
         path: build/ldp-app-latest.zip
@@ -206,14 +206,12 @@ jobs:
 
     - name: Create Release Asset (on release)
       if: github.event_name == 'release'
-      uses: actions/upload-release-asset@v1
+      uses: softprops/action-gh-release@v2
+      with:
+        files: build/ldp-app-${{ github.run_number }}.zip
+        name: ldp-app-${{ github.event.release.tag_name }}.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: build/ldp-app-${{ github.run_number }}.zip
-        asset_name: ldp-app-${{ github.event.release.tag_name }}.zip
-        asset_content_type: application/zip
 
   docker-build:
     runs-on: ubuntu-latest

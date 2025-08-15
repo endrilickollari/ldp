@@ -39,7 +39,7 @@ jobs:
           libgomp1
 
     - name: Cache pip dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
@@ -88,7 +88,7 @@ jobs:
         fail_ci_if_error: false
 
     - name: Upload test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: test-results-${{ matrix.python-version }}
@@ -99,7 +99,7 @@ jobs:
         retention-days: 30
 
     - name: Upload coverage report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: coverage-report-${{ matrix.python-version }}
