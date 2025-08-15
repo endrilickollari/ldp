@@ -5,6 +5,7 @@ Test configuration and fixtures
 import pytest
 import os
 import tempfile
+from unittest.mock import Mock, patch
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -37,6 +38,27 @@ def override_get_db():
 
 # Override the dependency
 app.dependency_overrides[get_db] = override_get_db
+
+# Mock Celery for testing
+@pytest.fixture(scope="session", autouse=True)
+def mock_celery():
+    """Mock Celery app and tasks for testing"""
+    with patch('workers.celery_app.celery_app') as mock_celery_app:
+        # Mock the send_task method
+        mock_task = Mock()
+        mock_task.id = "test-task-id-123"
+        mock_celery_app.send_task.return_value = mock_task
+        
+        # Mock AsyncResult
+        with patch('celery.result.AsyncResult') as mock_async_result:
+            mock_result = Mock()
+            mock_result.status = "PENDING"
+            mock_result.state = "PENDING" 
+            mock_result.result = None
+            mock_result.info = {}
+            mock_async_result.return_value = mock_result
+            
+            yield mock_celery_app, mock_result
 
 client = TestClient(app)
 
