@@ -1,0 +1,36 @@
+# Docker ignore file to exclude unnecessary files from build context
+.git
+.gitignore
+.dockerignore
+README.md
+.env.example
+.pytest_cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.coverage
+.vscode
+.idea
+*.log
+server.log
+.DS_Store
+Thumbs.db
+
+# Test files (optional - remove if you want to run tests in container)
+tests/
+pytest.ini
+run_tests.py
+
+# Development files
+.env.local
+.env.development
+
+# Database files (keep app.db if using SQLite)
+# app.db
+
+# Temporary files
+*.tmp
+*.temp
+/tmp
+/temp

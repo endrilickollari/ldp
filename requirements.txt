@@ -6,6 +6,7 @@ python-multipart
 # Asynchronous Task Queue
 celery
 redis
+flower
 
 # Data Parsing & OCR
 pandas
