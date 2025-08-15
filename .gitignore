@@ -11,6 +11,17 @@ __pycache__/
 .idea/
 .vscode/
 
+# Build artifacts
+build/
+dist/
+*.zip
+*.tar.gz
 
+# Database and logs
 app.db
 server.log
+
+# Uploads and temporary files
+uploads/
+logs/
+tmp/

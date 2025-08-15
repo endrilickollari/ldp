@@ -1,0 +1,109 @@
+# GitHub Actions workflow for building and publishing the LDP app as a zip artifact
+
+name: Build and Package App
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  build-and-package:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install system dependencies for testing
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y tesseract-ocr tesseract-ocr-eng libtesseract-dev poppler-utils
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install flower
+
+    - name: Run tests
+      run: python -m pytest tests/ -v --tb=short
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+
+    - name: Create application package
+      run: |
+        # Create build directory
+        mkdir -p dist/ldp-app
+        
+        # Copy application files
+        cp -r app/ dist/ldp-app/
+        cp -r workers/ dist/ldp-app/
+        cp -r tests/ dist/ldp-app/
+        
+        # Copy configuration and setup files
+        cp requirements.txt Dockerfile docker-compose.yml dist/ldp-app/
+        cp pytest.ini README.md init_db.py migrate_db.py run_tests.py dist/ldp-app/
+        
+        # Copy docker script if it exists
+        if [ -f docker.sh ]; then cp docker.sh dist/ldp-app/; fi
+        
+        # Create startup script
+        cat > dist/ldp-app/start.sh << 'EOF'
+        #!/bin/bash
+        echo "Large Document Processing API - Quick Start"
+        
+        # Create virtual environment if it doesn't exist
+        if [ ! -d "venv" ]; then
+            python -m venv venv
+        fi
+        
+        source venv/bin/activate
+        pip install -r requirements.txt
+        
+        # Initialize database
+        python init_db.py
+        
+        # Start the application
+        echo "Starting server at http://localhost:8000"
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+        EOF
+        
+        chmod +x dist/ldp-app/start.sh
+        
+        # Create build info
+        echo "Build Date: $(date)" > dist/ldp-app/BUILD_INFO.txt
+        echo "Git Commit: ${GITHUB_SHA}" >> dist/ldp-app/BUILD_INFO.txt
+        echo "Git Branch: ${GITHUB_REF_NAME}" >> dist/ldp-app/BUILD_INFO.txt
+
+    - name: Create zip package
+      run: |
+        cd dist
+        zip -r ../ldp-app-${GITHUB_SHA::8}.zip ldp-app/
+
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ldp-app-package
+        path: ldp-app-*.zip
+        retention-days: 30
+
+    - name: Upload to release (if release event)
+      if: github.event_name == 'release'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ldp-app-${{ github.sha }}.zip
+        asset_name: ldp-app-${{ github.event.release.tag_name }}.zip
+        asset_content_type: application/zip

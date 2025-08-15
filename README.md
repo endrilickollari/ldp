@@ -1,37 +1,52 @@
-# 🚀 Intelligent Document Processing API
+# 🚀 Large Document Processing API
+
+[![Build and Publish App](https://github.com/endrilickollari/ldp/actions/workflows/build-and-publish.yml/badge.svg)](https://github.com/endrilickollari/ldp/actions/workflows/build-and-publish.yml)
+[![Simple Build](https://github.com/endrilickollari/ldp/actions/workflows/simple-build.yml/badge.svg)](https://github.com/endrilickollari/ldp/actions/workflows/simple-build.yml)
+[![Run Tests](https://github.com/endrilickollari/ldp/actions/workflows/test.yml/badge.svg)](https://github.com/endrilickollari/ldp/actions/workflows/test.yml)
+[![Quick Tests](https://github.com/endrilickollari/ldp/actions/workflows/quick-test.yml/badge.svg)](https://github.com/endrilickollari/ldp/actions/workflows/quick-test.yml)
 
 > **Advanced AI-Powered Document Analysis with Dynamic Schema Generation**
 
 An enterprise-grade asynchronous document processing service that leverages Google Gemini AI to intelligently extract and structure data from any type of business document. Unlike traditional systems with rigid schemas, this API uses dynamic AI-driven analysis to create optimal data structures tailored to each document's content.
 
+## 📋 Table of Contents
+
+- [✨ Key Features](#-key-features)
+- [🏛️ Architecture](#-architecture)
+- [🚀 Quick Start](#-quick-start)
+- [📡 API Reference](#-api-reference)
+- [🧪 Testing](#-testing)
+- [🔄 CI/CD Workflows](#-cicd-workflows)
+- [🐳 Docker Deployment](#-docker-deployment)
+- [📊 Performance & Scalability](#-performance--scalability)
+- [🛡️ Security & Compliance](#-security--compliance)
+- [� Contributing](#-contributing)
+- [🎯 Roadmap](#-roadmap)
+
 ## ✨ Key Features
 
-### 🧠 **Intelligent Dynamic Schema Generation**
-
+### �🧠 **Intelligent Dynamic Schema Generation**
 - **No Predefined Schemas**: AI analyzes document content and creates optimal JSON structures automatically
 - **Adaptive Processing**: Handles receipts, contracts, reports, and any business document type
 - **Comprehensive Data Extraction**: Captures ALL available information, not just predefined fields
 - **Multi-Language Support**: Processes documents in any language
 
 ### 📄 **Universal Document Support**
-
 - **PDFs**: Text-based and image-based (with OCR)
 - **Excel Files**: .xlsx and .xls formats
 - **Images**: .png, .jpg, .jpeg (with OCR)
 - **Smart Processing**: Automatically detects document type and applies appropriate extraction methods
 
 ### 🏗️ **Production-Ready Architecture**
-
 - **Asynchronous Processing**: Non-blocking API with real-time status updates
 - **Scalable Design**: Web-Queue-Worker architecture using FastAPI, Celery, and Redis
 - **Stateless Workers**: Horizontal scaling ready
 - **Robust Error Handling**: Comprehensive logging and error recovery
 
 ### 🔍 **Advanced Data Extraction**
-
 - **Context-Aware Analysis**: AI understands document context and relationships
 - **Precise Value Extraction**: Preserves exact numbers, dates, and formatting
-- **Hierarchical Structuring**: Creates nested objects for related data (vendor details, line items, etc.)
+- **Hierarchical Structuring**: Creates nested objects for related data
 - **Metadata Capture**: Extracts system codes, reference numbers, and technical details
 
 ## 🏛️ Architecture
@@ -51,7 +66,6 @@ graph TD
 ```
 
 ### Components
-
 - **🌐 Web Tier**: FastAPI REST API for file uploads and status monitoring
 - **🔄 Queue Tier**: Redis message broker with Celery task management
 - **⚡ Worker Tier**: Asynchronous document processing with AI analysis
@@ -60,8 +74,7 @@ graph TD
 ## 🚀 Quick Start
 
 ### Prerequisites
-
-- Python 3.8+
+- Python 3.11+
 - Redis server
 - Tesseract OCR
 - Google Gemini API key
@@ -76,7 +89,7 @@ brew install tesseract redis
 
 # Ubuntu/Debian  
 sudo apt-get update
-sudo apt-get install tesseract-ocr redis-server
+sudo apt-get install tesseract-ocr tesseract-ocr-eng libtesseract-dev poppler-utils redis-server
 
 # Windows (using Chocolatey)
 choco install tesseract redis
@@ -85,21 +98,17 @@ choco install tesseract redis
 #### 2. Clone and Setup Project
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/endrilickollari/ldp.git
 cd ldp
-python3 -m venv venv
+python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
+pip install flower  # For Celery monitoring
 ```
 
 #### 3. Configure Environment
 
-```bash
-cp .env.example .env
-# Edit .env and add your Google Gemini API key
-```
-
-Required environment variables:
+Create a `.env` file with your configuration:
 
 ```env
 GOOGLE_API_KEY=your-google-gemini-api-key-here
@@ -107,17 +116,34 @@ CELERY_BROKER_URL=redis://localhost:6379/0
 CELERY_RESULT_BACKEND=redis://localhost:6379/0
 ```
 
-#### 4. Start Services
+#### 4. Initialize Database
+
+```bash
+python init_db.py
+```
+
+#### 5. Start Services
 
 ```bash
 # Terminal 1: Start Redis
 redis-server
 
 # Terminal 2: Start API Server
-uvicorn app.main:app --reload
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-# Terminal 3: Start Worker
+# Terminal 3: Start Celery Worker
 celery -A workers.celery_app worker --loglevel=info
+
+# Terminal 4: Start Flower (optional - for monitoring)
+celery -A workers.celery_app flower
+```
+
+### Using the Startup Script
+
+For quick startup, use the provided script:
+
+```bash
+./start.sh
 ```
 
 ## 📡 API Reference
@@ -130,7 +156,6 @@ Content-Type: multipart/form-data
 ```
 
 **Request:**
-
 ```bash
 curl -X POST "http://localhost:8000/v1/jobs" \
   -H "Content-Type: multipart/form-data" \
@@ -138,7 +163,6 @@ curl -X POST "http://localhost:8000/v1/jobs" \
 ```
 
 **Response:**
-
 ```json
 {
   "job_id": "550e8400-e29b-41d4-a716-446655440000",
@@ -153,19 +177,7 @@ curl -X POST "http://localhost:8000/v1/jobs" \
 GET /v1/jobs/{job_id}
 ```
 
-**Response (In Progress):**
-
-```json
-{
-  "job_id": "550e8400-e29b-41d4-a716-446655440000",
-  "status": "PROGRESS",
-  "stage": "Analyzing with Gemini",
-  "progress": 70
-}
-```
-
 **Response (Completed):**
-
 ```json
 {
   "job_id": "550e8400-e29b-41d4-a716-446655440000",
@@ -173,7 +185,6 @@ GET /v1/jobs/{job_id}
   "stage": "Completed",
   "progress": 100,
   "result": {
-    // AI-generated dynamic JSON structure based on document content
     "document_type": "contract",
     "vendor": { "name": "...", "tax_id": "..." },
     "line_items": [...],
@@ -182,121 +193,190 @@ GET /v1/jobs/{job_id}
 }
 ```
 
-## 🔧 Configuration Options
+### Interactive API Documentation
 
-### Document Processing Settings
+Visit `http://localhost:8000/docs` for the complete interactive API documentation powered by Swagger UI.
 
-```python
-# workers/tasks.py - Customizable settings
+## 🧪 Testing
 
-# OCR Resolution for image-based PDFs
-PDF_OCR_RESOLUTION = 300
+### Running Tests
 
-# Supported file extensions
-SUPPORTED_EXTENSIONS = {
-    'pdf': ['.pdf'],
-    'excel': ['.xlsx', '.xls'], 
-    'image': ['.png', '.jpg', '.jpeg']
-}
+```bash
+# Run all tests
+python -m pytest tests/ -v
 
-# Gemini Model Configuration
-GEMINI_MODEL = 'gemini-1.5-pro-latest'
-RESPONSE_FORMAT = {"response_mime_type": "application/json"}
+# Run tests with coverage
+python -m pytest tests/ --cov=app --cov=workers --cov-report=html
+
+# Run specific test file
+python -m pytest tests/test_auth.py -v
+
+# Run tests with custom test runner
+python run_tests.py
 ```
 
-### Celery Worker Settings
+### Test Structure
 
-```python
-# workers/celery_app.py
-
-# Task retry configuration
-retry_kwargs = {'max_retries': 3}
-retry_backoff = True
-
-# Worker concurrency
-celery -A workers.celery_app worker --loglevel=info --concurrency=4
+```
+tests/
+├── conftest.py              # Test fixtures and configuration
+├── test_api_keys.py         # API key authentication tests
+├── test_auth.py             # Authentication system tests
+├── test_companies.py        # Company management tests
+├── test_jobs.py             # Document processing job tests
+├── test_main.py             # Main application tests
+├── test_plans.py            # User plan tests
+└── test_user_service.py     # User service tests
 ```
 
-## 🎯 Use Cases
+### Test Coverage
 
-### Financial Document Processing
+Our test suite covers:
+- **API Endpoints**: All REST API endpoints with various scenarios
+- **Authentication**: JWT token validation and user management
+- **Document Processing**: File upload and processing workflows
+- **Database Operations**: User, company, and plan management
+- **Error Handling**: Edge cases and error scenarios
+- **Integration Tests**: End-to-end workflow testing
 
-- **Contracts**: Service agreements, purchase orders, legal documents
-- **Reports**: Financial reports, business analytics, survey data
-- **Receipts**: Purchase receipts, expense reports, transaction records
-- **Forms**: Application forms, registration documents, questionnaires
-- **Receipts**: Expense receipts with line item breakdown
-- **Financial Statements**: Balance sheets, P&L statements
-- **Tax Documents**: VAT returns, tax certificates
+## 🔄 CI/CD Workflows
 
-### Business Document Analysis
+This project includes comprehensive GitHub Actions workflows for automated building, testing, and deployment.
 
-- **Contracts**: Legal agreements with parties and terms
-- **Purchase Orders**: B2B transaction documents
-- **Inventory Reports**: Stock levels and valuations
-- **Compliance Forms**: Regulatory submissions
+### Available Workflows
 
-### Data Migration Projects
+#### 1. **Build and Publish App** (`build-and-publish.yml`)
+**Comprehensive build and deployment workflow**
 
-- **Legacy System Migration**: Extract structured data from old document formats
-- **Digital Transformation**: Convert paper/PDF processes to structured data
-- **Data Warehousing**: Feed document data into analytics systems
-- **Compliance Archives**: Structure historical documents for searchability
+**Triggers:**
+- Push to `main` or `develop` branches
+- Pull requests to `main` branch
+- Release events
+- Manual trigger
 
-## 🔍 Advanced Features
+**Features:**
+- Builds the application with Python 3.11
+- Installs system dependencies (Tesseract, Poppler, etc.)
+- Runs the full test suite
+- Creates comprehensive application packages with:
+  - All source code and dependencies
+  - Auto-generated startup scripts
+  - Build documentation and metadata
+  - Docker configuration files
+- Publishes artifacts (30-90 day retention)
+- Builds and pushes Docker images to GitHub Container Registry
+- Attaches build artifacts to GitHub releases
 
-### Intelligent Document Type Detection
+#### 2. **Simple Build** (`simple-build.yml`)
+**Lightweight workflow for quick builds**
 
-The AI automatically identifies document types and adapts extraction accordingly:
+**Features:**
+- Fast build and test process
+- Creates minimal application packages
+- Perfect for development branches
+- Uploads build artifacts to GitHub Actions
 
-```json
-{
-  "document_type": "contract",          // Auto-detected
-  "confidence_score": 0.95,            // Detection confidence
-  "processing_strategy": "legal_document",
-  "detected_language": "English",
-  "extracted_entities": [...],
-  // ... structured content
-}
+#### 3. **Comprehensive Tests** (`test.yml`)
+**Full testing workflow with coverage reporting**
+
+**Features:**
+- Runs complete test suite with pytest
+- Generates code coverage reports (HTML, XML, terminal)
+- Uploads coverage to Codecov
+- Tests Docker container functionality
+- Creates detailed test reports and artifacts
+- Supports matrix testing across Python versions
+- Generates test summaries in GitHub Actions
+
+#### 4. **Quick Tests** (`quick-test.yml`)
+**Fast testing for rapid development feedback**
+
+**Features:**
+- Rapid test execution with fail-fast option
+- Basic module import validation
+- Minimal system dependency installation
+- Quick feedback for development workflow
+
+### Build Artifacts
+
+All workflows create comprehensive zip packages containing:
+
+- **Application Code**: Complete `app/`, `workers/`, `tests/` directories
+- **Configuration Files**: `requirements.txt`, `docker-compose.yml`, `Dockerfile`, `pytest.ini`
+- **Startup Scripts**: Auto-generated `start.sh` for one-command deployment
+- **Database Setup**: `init_db.py`, `migrate_db.py` scripts
+- **Documentation**: `README.md`, build metadata, and usage instructions
+
+### Using Build Artifacts
+
+#### Download from GitHub Actions
+1. Go to the "Actions" tab in the GitHub repository
+2. Click on a completed workflow run
+3. Download the artifact zip file
+4. Extract and run `./start.sh` to start the application
+
+#### Download from Releases
+1. Go to the "Releases" section
+2. Download the attached zip file from any release
+3. Extract and follow the setup instructions
+
+### Manual Workflow Triggers
+
+Trigger any workflow manually:
+1. Go to the "Actions" tab
+2. Select the desired workflow
+3. Click "Run workflow"
+4. Choose the branch and click "Run workflow"
+
+### Docker Images
+
+The workflows build and publish Docker images to GitHub Container Registry:
+
+```bash
+# Pull the latest image
+docker pull ghcr.io/endrilickollari/ldp:latest
+
+# Run the container
+docker run -p 8000:8000 ghcr.io/endrilickollari/ldp:latest
 ```
 
-### Multi-Currency Support
+## 🐳 Docker Deployment
 
-Handles complex financial documents with currency conversions:
+### Using Docker
 
-```json
-{
-  "financial_summary": {
-    "primary_currency": "EUR",
-    "secondary_currency": "LEK", 
-    "exchange_rate": "1x97.23",
-    "totals": {
-      "eur": 1600.0,
-      "lek": 155568.0
-    }
-  }
-}
+```bash
+# Build the image
+docker build -t ldp-app .
+
+# Run the container
+docker run -p 8000:8000 -e GOOGLE_API_KEY=your-key ldp-app
 ```
 
-### Hierarchical Data Structuring
+### Using Docker Compose
 
-Creates logical nested structures for related information:
+```bash
+# Start all services (API, Redis, Celery worker)
+docker-compose up
 
-```json
-{
-  "parties": {
-    "vendor": {
-      "identity": { "name": "...", "tax_id": "..." },
-      "contact": { "address": "...", "phone": "..." }
-    },
-    "customer": {
-      "identity": { "name": "...", "tax_id": "..." },
-      "billing_address": "...",
-      "shipping_address": "..."
-    }
-  }
-}
+# Run in background
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
 ```
+
+### Docker Configuration
+
+The Dockerfile includes:
+- Python 3.11 slim base image
+- System dependencies (Tesseract OCR, Poppler utilities)
+- Python package installation with caching optimization
+- Proper directory structure and permissions
+- Environment variable configuration
+- Health check endpoints
 
 ## 📊 Performance & Scalability
 
@@ -312,7 +392,6 @@ Creates logical nested structures for related information:
 ### Scaling Guidelines
 
 **Horizontal Scaling:**
-
 ```bash
 # Add more workers
 celery -A workers.celery_app worker --loglevel=info --concurrency=8
@@ -323,7 +402,6 @@ celery -A workers.celery_app worker --hostname=worker2@%h
 ```
 
 **Production Deployment:**
-
 ```bash
 # Using Gunicorn for API
 gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker
@@ -335,14 +413,18 @@ redis-sentinel /path/to/sentinel.conf
 ## 🛡️ Security & Compliance
 
 ### Data Privacy
-
 - **No Data Persistence**: Documents processed in memory only
-- **Secure Transmission**: All API calls over HTTPS
+- **Secure Transmission**: All API calls over HTTPS in production
 - **API Key Protection**: Environment-based configuration
 - **Worker Isolation**: Stateless processing prevents data leaks
 
-### GDPR Compliance
+### Authentication & Authorization
+- JWT-based authentication system
+- User management with different access levels
+- Company-based access control
+- API key authentication for service-to-service calls
 
+### GDPR Compliance
 ```python
 # Optional data retention settings
 RETAIN_PROCESSING_LOGS = False
@@ -350,96 +432,98 @@ ANONYMIZE_PERSONAL_DATA = True
 DATA_RETENTION_DAYS = 0  # Immediate cleanup
 ```
 
-## 🧪 Testing
+## � Contributing
 
-### Unit Tests
+### Development Workflow
 
-```bash
-# Run test suite
-python -m pytest tests/
-
-# Test specific component
-python -m pytest tests/test_document_processing.py
-
-# Coverage report
-python -m pytest --cov=app --cov=workers tests/
-```
-
-### Integration Testing
-
-```bash
-# Test complete pipeline
-python test_api.py
-
-# Load testing
-locust -f tests/load_test.py --host=http://localhost:8000
-```
-
-## 🚀 Deployment
-
-### Docker Deployment
-
-```dockerfile
-# Dockerfile provided
-docker build -t document-processor .
-docker run -p 8000:8000 document-processor
-```
-
-### Production Checklist
-
-- [ ] Configure proper Redis persistence
-- [ ] Set up SSL certificates for HTTPS
-- [ ] Configure logging and monitoring (ELK stack, Prometheus)
-- [ ] Set up backup and disaster recovery
-- [ ] Configure auto-scaling policies
-- [ ] Implement rate limiting and authentication
-- [ ] Set up health checks and alerts
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature/amazing-feature`
-3. Commit changes: `git commit -m 'Add amazing feature'`
-4. Push to branch: `git push origin feature/amazing-feature`
-5. Open Pull Request
+1. **Fork the repository**
+2. **Create feature branch**: `git checkout -b feature/amazing-feature`
+3. **Make changes and add tests**
+4. **Run tests**: `python -m pytest tests/ -v`
+5. **Commit changes**: `git commit -m 'Add amazing feature'`
+6. **Push to branch**: `git push origin feature/amazing-feature`
+7. **Open Pull Request**
 
 ### Development Setup
 
 ```bash
-# Install development dependencies
-pip install -r requirements-dev.txt
+# Clone your fork
+git clone https://github.com/your-username/ldp.git
+cd ldp
 
-# Run linting
-flake8 app/ workers/
-black app/ workers/
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+pip install pytest-cov pytest-html pytest-xdist
+
+# Install pre-commit hooks (optional)
+pip install pre-commit
+pre-commit install
+
+# Run tests to ensure everything works
+python -m pytest tests/ -v
+```
+
+### Code Style
+
+We follow PEP 8 and use automated formatting:
+
+```bash
+# Format code
+black app/ workers/ tests/
+
+# Lint code
+flake8 app/ workers/ tests/
 
 # Type checking
 mypy app/ workers/
 ```
 
-## 📝 License
+### Testing Guidelines
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+- Write tests for all new features
+- Maintain test coverage above 80%
+- Include both unit tests and integration tests
+- Test error scenarios and edge cases
+- Update tests when modifying existing functionality
 
 ## 🎯 Roadmap
 
-### Version 2.0 Planned Features
-
-- [ ] **Multi-format Output**: Export to Excel, CSV, XML
+### Version 2.1 - Enhanced Features
+- [ ] **Multi-format Output**: Export to Excel, CSV, XML formats
 - [ ] **Batch Processing**: Handle ZIP archives with multiple documents
 - [ ] **Custom Templates**: User-defined extraction templates
-- [ ] **Webhook Integration**: Real-time notifications
-- [ ] **Dashboard UI**: Web interface for monitoring and management
-- [ ] **API Authentication**: JWT-based security
-- [ ] **Document Classification**: ML-based automatic document categorization
-- [ ] **Version Control**: Track document processing history
+- [ ] **Webhook Integration**: Real-time processing notifications
+- [ ] **Enhanced UI**: Web dashboard for monitoring and management
 
-## 📞 Support
+### Version 2.2 - Advanced AI
+- [ ] **Document Classification**: ML-based automatic categorization
+- [ ] **Custom Model Training**: Fine-tune models for specific document types
+- [ ] **Multi-model Support**: Integration with multiple AI providers
+- [ ] **Advanced OCR**: Better handling of handwritten text and complex layouts
 
-- **Documentation**: [API Docs](http://localhost:8000/docs)
-- **Issues**: [GitHub Issues](https://github.com/your-repo/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-repo/discussions)
+### Version 2.3 - Enterprise Features
+- [ ] **Advanced Authentication**: LDAP/SAML integration
+- [ ] **Audit Logging**: Comprehensive audit trail
+- [ ] **Data Governance**: Advanced privacy and compliance features
+- [ ] **Multi-tenant Architecture**: SaaS-ready deployment options
+
+## 📞 Support & Documentation
+
+- **Interactive API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **GitHub Issues**: [Report bugs and request features](https://github.com/endrilickollari/ldp/issues)
+- **GitHub Discussions**: [Community support and questions](https://github.com/endrilickollari/ldp/discussions)
+- **Wiki**: [Additional documentation and guides](https://github.com/endrilickollari/ldp/wiki)
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-Built with ❤️ using FastAPI, Celery, Redis, and Google Gemini AI
+**Built with ❤️ using FastAPI, Celery, Redis, and Google Gemini AI**
+
+*Last updated: August 2025*

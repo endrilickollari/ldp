@@ -1,0 +1,44 @@
+name: Quick Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  quick-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y tesseract-ocr tesseract-ocr-eng libtesseract-dev poppler-utils
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run quick tests
+      run: |
+        mkdir -p uploads logs
+        python init_db.py
+        python -m pytest tests/ -v --tb=short -x
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+
+    - name: Test import modules
+      run: |
+        python -c "import app.main; print('✅ Main app imports successfully')"
+        python -c "from app.api import auth, companies, jobs, plans; print('✅ API modules import successfully')"
+        python -c "from workers.celery_app import celery_app; print('✅ Celery app imports successfully')"
