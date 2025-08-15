@@ -21,3 +21,11 @@ google-generativeai
 pydantic-settings
 python-dotenv
 jsonschema
+
+# Authentication & Database
+SQLAlchemy
+alembic
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart
+email-validator

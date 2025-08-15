@@ -4,10 +4,12 @@ from celery.exceptions import Ignore
 import logging
 import io
 import json
+import time
 import pandas as pd
 import pdfplumber
 import google.generativeai as genai  # type: ignore
 from app.core.config import settings
+from typing import Optional
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -126,7 +128,8 @@ def build_gemini_prompt(text_content: str) -> str:
     """
 
 @celery_app.task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3})
-def process_document(self, file_content: bytes, original_filename: str):
+def process_document(self, file_content: bytes, original_filename: str, metadata: Optional[dict] = None):
+    start_time = time.time()  # Initialize start_time before try block
     try:
         logger.info(f"Starting processing for job {self.request.id} on file {original_filename}")
         self.update_state(state='PROGRESS', meta={'stage': 'Parsing', 'progress': 25})
@@ -194,9 +197,46 @@ def process_document(self, file_content: bytes, original_filename: str):
 
         final_meta = {'stage': 'Completed', 'progress': 100, 'result': structured_result}
         self.update_state(state=states.SUCCESS, meta=final_meta)
+        
+        # Update usage log if metadata provided
+        if metadata and 'usage_log_id' in metadata:
+            try:
+                from app.database import SessionLocal
+                from app.models.user import UsageLog
+                
+                db = SessionLocal()
+                usage_log = db.query(UsageLog).filter(UsageLog.id == metadata['usage_log_id']).first()
+                if usage_log:
+                    setattr(usage_log, 'success', True)
+                    setattr(usage_log, 'processing_time_seconds', time.time() - start_time)
+                    # Estimate tokens used based on response length
+                    setattr(usage_log, 'tokens_used', len(json.dumps(structured_result)) // 4)  # Rough estimate
+                    db.commit()
+                db.close()
+            except Exception as e:
+                logger.warning(f"Failed to update usage log: {e}")
+        
         return final_meta
 
     except Exception as e:
         logger.error(f"Task failed for job {self.request.id}: {e}", exc_info=True)
+        
+        # Update usage log on failure
+        if metadata and 'usage_log_id' in metadata:
+            try:
+                from app.database import SessionLocal
+                from app.models.user import UsageLog
+                
+                db = SessionLocal()
+                usage_log = db.query(UsageLog).filter(UsageLog.id == metadata['usage_log_id']).first()
+                if usage_log:
+                    setattr(usage_log, 'success', False)
+                    setattr(usage_log, 'error_message', str(e))
+                    setattr(usage_log, 'processing_time_seconds', time.time() - start_time)
+                    db.commit()
+                db.close()
+            except Exception as log_error:
+                logger.warning(f"Failed to update usage log on error: {log_error}")
+        
         self.update_state(state=states.FAILURE, meta={'exc_type': type(e).__name__, 'exc_message': str(e)})
         raise Ignore()
