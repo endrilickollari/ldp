@@ -11,6 +11,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+# Set test environment variables before importing app modules
+os.environ["CELERY_BROKER_URL"] = "memory://localhost/"
+os.environ["CELERY_RESULT_BACKEND"] = "cache+memory://localhost/"
+os.environ["DATABASE_URL"] = "sqlite:///./test.db"
+
 from app.database import get_db, Base
 from app.main import app
 from app.models.user import User, Company, PlanType, UserType, APIKey, PlanLimits, UsageLog
@@ -43,22 +48,26 @@ app.dependency_overrides[get_db] = override_get_db
 @pytest.fixture(scope="session", autouse=True)
 def mock_celery():
     """Mock Celery app and tasks for testing"""
-    with patch('workers.celery_app.celery_app') as mock_celery_app:
+    # Mock the entire celery_app module
+    with patch('workers.celery_app.celery_app') as mock_celery_app, \
+         patch('app.api.jobs.celery_app', mock_celery_app):
         # Mock the send_task method
         mock_task = Mock()
         mock_task.id = "test-task-id-123"
         mock_celery_app.send_task.return_value = mock_task
         
-        # Mock AsyncResult
-        with patch('celery.result.AsyncResult') as mock_async_result:
+        # Mock AsyncResult globally
+        with patch('app.api.jobs.AsyncResult') as mock_async_result_class:
             mock_result = Mock()
             mock_result.status = "PENDING"
             mock_result.state = "PENDING" 
             mock_result.result = None
             mock_result.info = {}
-            mock_async_result.return_value = mock_result
+            mock_async_result_class.return_value = mock_result
             
-            yield mock_celery_app, mock_result
+            # Also patch any other imports of AsyncResult
+            with patch('celery.result.AsyncResult', mock_async_result_class):
+                yield mock_celery_app, mock_result
 
 client = TestClient(app)
 
