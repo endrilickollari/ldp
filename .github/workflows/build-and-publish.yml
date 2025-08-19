@@ -33,12 +33,14 @@ jobs:
           tesseract-ocr-eng \
           libtesseract-dev \
           poppler-utils \
-          libgl1-mesa-dev \
           libglib2.0-0 \
-          libsm6 \
-          libxext6 \
-          libxrender-dev \
-          libgomp1
+          libgomp1 \
+          libffi-dev \
+          pkg-config \
+          libjpeg-dev \
+          libpng-dev \
+          libtiff-dev \
+          libfreetype6-dev
 
     - name: Cache pip dependencies
       uses: actions/cache@v4
