@@ -10,6 +10,18 @@ class PlanType(str, PyEnum):
     PREMIUM = "premium" 
     EXTRA_PREMIUM = "extra_premium"
 
+class LicenseDuration(str, PyEnum):
+    MONTHLY = "monthly"
+    SIX_MONTHS = "six_months"
+    YEARLY = "yearly"
+    LIFETIME = "lifetime"
+
+class LicenseStatus(str, PyEnum):
+    ACTIVE = "active"
+    EXPIRED = "expired"
+    SUSPENDED = "suspended"
+    PENDING = "pending"
+
 class UserType(str, PyEnum):
     SOLO = "solo"
     ENTERPRISE = "enterprise"
@@ -49,6 +61,7 @@ class User(Base):
     company = relationship("Company", back_populates="users")
     api_keys = relationship("APIKey", back_populates="user", cascade="all, delete-orphan")
     usage_logs = relationship("UsageLog", back_populates="user", cascade="all, delete-orphan")
+    licenses = relationship("License", back_populates="user", cascade="all, delete-orphan")
     
 class APIKey(Base):
     __tablename__ = "api_keys"
@@ -93,3 +106,34 @@ class UsageLog(Base):
     # Relationships
     user = relationship("User", back_populates="usage_logs")
     api_key = relationship("APIKey")
+
+class License(Base):
+    __tablename__ = "licenses"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    license_key = Column(String, unique=True, index=True, nullable=False)
+    plan_type = Column(Enum(PlanType), nullable=False)
+    duration = Column(Enum(LicenseDuration), nullable=False)
+    status = Column(Enum(LicenseStatus), default=LicenseStatus.PENDING)
+    price_paid = Column(Float, nullable=False)
+    currency = Column(String, default="USD")
+    
+    # Date fields
+    issued_at = Column(DateTime(timezone=True), server_default=func.now())
+    activated_at = Column(DateTime(timezone=True), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True)  # NULL for lifetime
+    suspended_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Payment tracking
+    payment_id = Column(String, nullable=True)  # External payment processor ID
+    payment_method = Column(String, nullable=True)  # card, paypal, etc.
+    
+    # Additional metadata
+    extra_data = Column(Text, nullable=True)  # JSON string for additional data
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="licenses")

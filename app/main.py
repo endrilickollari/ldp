@@ -1,14 +1,29 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import jobs, auth, plans, companies
+from app.api import deployment_licenses as licenses
+from app.core.config import settings, DeploymentMode
 from dotenv import load_dotenv
 
 load_dotenv()
 
+# Create FastAPI app with deployment-aware configuration
+app_title = (
+    "Document Processing API - SaaS" 
+    if settings.DEPLOYMENT_MODE == DeploymentMode.SAAS 
+    else "Document Processing API - Self-Hosted"
+)
+
+app_description = (
+    "Cloud-hosted document processing service with premium subscriptions"
+    if settings.DEPLOYMENT_MODE == DeploymentMode.SAAS
+    else "Self-hosted document processing solution with license validation"
+)
+
 app = FastAPI(
-    title="Large Document Processing API",
-    description="An API to process large Excel and PDF files using OCR and LLMs with authentication and user plans.",
-    version="2.0.0"
+    title=app_title,
+    description=app_description,
+    version="2.1.0"
 )
 
 # Add CORS middleware
@@ -22,36 +37,88 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth.router, prefix="/v1/auth", tags=["Authentication"])
+app.include_router(licenses.router, prefix="/v1/licenses", tags=["License Management"])
 app.include_router(plans.router, prefix="/v1/plans", tags=["Plans & Usage"])
 app.include_router(companies.router, prefix="/v1/companies", tags=["Companies"])
 app.include_router(jobs.router, prefix="/v1", tags=["Jobs"])
 
 @app.get("/")
 def read_root():
-    return {
-        "message": "Welcome to the Document Processing API v2.0",
-        "features": [
-            "User authentication with JWT",
-            "Multiple subscription plans", 
-            "API key management",
-            "Usage tracking and limits",
-            "Document processing with AI"
-        ],
-        "docs": "/docs",
-        "auth_endpoints": {
-            "register": "/v1/auth/register",
-            "login": "/v1/auth/login",
-            "profile": "/v1/auth/me",
-            "company": "/v1/auth/company",
-            "api_keys": "/v1/auth/api-keys"
-        },
-        "plan_endpoints": {
-            "available_plans": "/v1/plans/plans",
-            "current_plan": "/v1/plans/current-plan",
-            "usage_stats": "/v1/plans/usage"
-        },
-        "company_endpoints": {
-            "company_users": "/v1/companies/users",
-            "company_info": "/v1/companies/{company_id}"
-        }
+    deployment_info = {
+        "mode": settings.DEPLOYMENT_MODE.value,
+        "is_saas": settings.DEPLOYMENT_MODE == DeploymentMode.SAAS,
+        "is_self_hosted": settings.DEPLOYMENT_MODE == DeploymentMode.SELF_HOSTED
     }
+    
+    if settings.DEPLOYMENT_MODE == DeploymentMode.SAAS:
+        return {
+            "message": "Welcome to Document Processing SaaS v2.1",
+            "deployment": "Cloud-hosted service",
+            "features": [
+                "Cloud-hosted - no setup required",
+                "Automatic updates and maintenance",
+                "Premium subscriptions",
+                "Free tier available" if settings.ALLOW_FREE_TIER else "Premium subscriptions only",
+                "API key management",
+                "Usage tracking and limits",
+                "Document processing with AI"
+            ],
+            "docs": "/docs",
+            "deployment_info": deployment_info,
+            "auth_endpoints": {
+                "register": "/v1/auth/register",
+                "login": "/v1/auth/login",
+                "profile": "/v1/auth/me",
+                "company": "/v1/auth/company",
+                "api_keys": "/v1/auth/api-keys"
+            },
+            "subscription_endpoints": {
+                "pricing": "/v1/licenses/pricing",
+                "purchase": "/v1/licenses/purchase",
+                "status": "/v1/licenses/status",
+                "my_licenses": "/v1/licenses/my-licenses"
+            },
+            "free_tier": {
+                "enabled": settings.ALLOW_FREE_TIER,
+                "max_documents": settings.MAX_FREE_DOCUMENTS if settings.ALLOW_FREE_TIER else 0
+            }
+        }
+    else:
+        return {
+            "message": "Welcome to Self-Hosted Document Processing v2.1",
+            "deployment": "Self-hosted instance",
+            "instance_info": {
+                "instance_id": settings.INSTANCE_ID or "Not configured",
+                "instance_name": settings.INSTANCE_NAME,
+                "organization": settings.ORGANIZATION_NAME,
+                "admin_email": settings.ADMIN_EMAIL
+            },
+            "features": [
+                "Self-hosted - full control over your data",
+                "License-based access control",
+                "Unlimited processing (with valid license)",
+                "On-premises deployment",
+                "API key management",
+                "Document processing with AI"
+            ],
+            "docs": "/docs",
+            "deployment_info": deployment_info,
+            "auth_endpoints": {
+                "register": "/v1/auth/register",
+                "login": "/v1/auth/login",
+                "profile": "/v1/auth/me",
+                "company": "/v1/auth/company",
+                "api_keys": "/v1/auth/api-keys"
+            },
+            "license_endpoints": {
+                "pricing": "/v1/licenses/pricing",
+                "purchase": "/v1/licenses/purchase",
+                "status": "/v1/licenses/status",
+                "my_licenses": "/v1/licenses/my-licenses",
+                "deployment_info": "/v1/licenses/deployment-info"
+            },
+            "license_server": {
+                "url": settings.LICENSE_SERVER_URL or "Not configured",
+                "validation_required": settings.REQUIRE_LICENSE_VALIDATION
+            }
+        }

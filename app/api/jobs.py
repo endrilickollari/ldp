@@ -6,7 +6,7 @@ from datetime import datetime
 
 from workers.celery_app import celery_app
 from app.schemas.job import JobCreateResponse, JobStatusResponse
-from app.core.dependencies import get_user_from_api_key
+from app.core.dependencies import get_user_from_api_key, get_licensed_user
 from app.services.user_service import UserService
 from app.database import get_db
 from sqlalchemy.orm import Session
@@ -19,10 +19,11 @@ router = APIRouter()
 async def create_job(
     request: Request, 
     file: UploadFile = File(...),
+    licensed_user: User = Depends(get_licensed_user),
     auth_data: Tuple[User, Optional[APIKey]] = Depends(get_user_from_api_key),
     db: Session = Depends(get_db)
 ):
-    """Create a new document processing job (requires authentication)"""
+    """Create a new document processing job (requires authentication and valid license)"""
     user, api_key = auth_data
     job_id = uuid.uuid4()
     user_service = UserService(db)
@@ -82,10 +83,11 @@ async def create_job(
 @router.get("/jobs/{job_id}", response_model=JobStatusResponse)
 def get_job_status(
     job_id: str,
+    licensed_user: User = Depends(get_licensed_user),
     auth_data: Tuple[User, Optional[APIKey]] = Depends(get_user_from_api_key),
     db: Session = Depends(get_db)
 ):
-    """Get job status (requires authentication)"""
+    """Get job status (requires authentication and valid license)"""
     user, api_key = auth_data
     
     # Validate job_id is a valid UUID

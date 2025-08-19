@@ -1,7 +1,7 @@
 from pydantic import BaseModel, EmailStr, model_validator
 from typing import Optional, Any, Dict
 from datetime import datetime
-from app.models.user import PlanType, UserType
+from app.models.user import PlanType, UserType, LicenseDuration, LicenseStatus
 
 # Company Schemas
 class CompanyBase(BaseModel):
@@ -119,3 +119,40 @@ class UsageStatsBase(BaseModel):
 
 class UsageStats(UsageStatsBase):
     pass
+
+# License Schemas
+class LicenseBase(BaseModel):
+    plan_type: PlanType
+    duration: LicenseDuration
+
+class LicenseCreate(LicenseBase):
+    payment_method: Optional[str] = None
+
+class LicensePurchase(LicenseBase):
+    payment_method: str
+    payment_id: Optional[str] = None
+
+class License(LicenseBase):
+    id: int
+    user_id: int
+    license_key: str
+    status: LicenseStatus
+    price_paid: float
+    currency: str
+    issued_at: datetime
+    activated_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    suspended_at: Optional[datetime] = None
+    payment_id: Optional[str] = None
+    payment_method: Optional[str] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+class LicenseStatusResponse(BaseModel):
+    has_valid_license: bool
+    current_license: Optional[License] = None
+    days_until_expiry: Optional[int] = None
+    license_type: Optional[str] = None
