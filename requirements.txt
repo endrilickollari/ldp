@@ -15,6 +15,11 @@ pdfplumber
 pytesseract
 Pillow
 
+# Image Processing & Computer Vision (optional)
+opencv-python
+numpy
+scikit-image
+
 # LLM Client
 google-generativeai
 
