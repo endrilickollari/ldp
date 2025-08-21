@@ -55,7 +55,7 @@ async def get_user_from_api_key(
 ) -> Tuple[User, Optional[APIKey]]:
     """Get user from API key or JWT token"""
     credentials_exception = HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
+        status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid authentication credentials",
     )
     

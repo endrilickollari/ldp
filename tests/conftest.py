@@ -69,6 +69,30 @@ def mock_celery():
             with patch('celery.result.AsyncResult', mock_async_result_class):
                 yield mock_celery_app, mock_result
 
+# Mock License Service for testing
+@pytest.fixture(scope="session", autouse=True)
+def mock_license_service():
+    """Mock License Service to always return valid licenses for tests"""
+    with patch('app.services.license_service.LicenseService.check_license_validity') as mock_check, \
+         patch('app.services.license_service.LicenseService.is_license_required_for_endpoint') as mock_required:
+        
+        # Import inside function to avoid circular imports
+        from app.schemas.user import LicenseStatusResponse
+        
+        # Mock that all users have valid licenses
+        mock_license_response = LicenseStatusResponse(
+            has_valid_license=True,
+            current_license=None,
+            days_until_expiry=365,
+            license_type="yearly"
+        )
+        mock_check.return_value = mock_license_response
+        
+        # Mock that no endpoints require licenses during testing (optional - we can keep this True for more realistic tests)
+        mock_required.return_value = True  # Keep license checks but ensure users always have valid licenses
+        
+        yield mock_check, mock_required
+
 client = TestClient(app)
 
 

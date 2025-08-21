@@ -19,12 +19,29 @@ router = APIRouter()
 async def create_job(
     request: Request, 
     file: UploadFile = File(...),
-    licensed_user: User = Depends(get_licensed_user),
     auth_data: Tuple[User, Optional[APIKey]] = Depends(get_user_from_api_key),
     db: Session = Depends(get_db)
 ):
     """Create a new document processing job (requires authentication and valid license)"""
     user, api_key = auth_data
+    
+    # Check license manually since we need to support both JWT and API key auth
+    from app.services.license_service import LicenseService
+    license_service = LicenseService(db)
+    
+    if license_service.is_license_required_for_endpoint(request.url.path):
+        license_status = license_service.check_license_validity(user)
+        if not license_status.has_valid_license:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail={
+                    "error": "Valid license required",
+                    "message": "This feature requires a valid license. Please purchase a license to continue.",
+                    "license_status": "expired" if license_status.current_license else "none",
+                    "purchase_url": "/v1/licenses/pricing"
+                }
+            )
+    
     job_id = uuid.uuid4()
     user_service = UserService(db)
     file_content = b""
@@ -83,12 +100,29 @@ async def create_job(
 @router.get("/jobs/{job_id}", response_model=JobStatusResponse)
 def get_job_status(
     job_id: str,
-    licensed_user: User = Depends(get_licensed_user),
+    request: Request,
     auth_data: Tuple[User, Optional[APIKey]] = Depends(get_user_from_api_key),
     db: Session = Depends(get_db)
 ):
     """Get job status (requires authentication and valid license)"""
     user, api_key = auth_data
+    
+    # Check license manually since we need to support both JWT and API key auth
+    from app.services.license_service import LicenseService
+    license_service = LicenseService(db)
+    
+    if license_service.is_license_required_for_endpoint(request.url.path):
+        license_status = license_service.check_license_validity(user)
+        if not license_status.has_valid_license:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail={
+                    "error": "Valid license required",
+                    "message": "This feature requires a valid license. Please purchase a license to continue.",
+                    "license_status": "expired" if license_status.current_license else "none",
+                    "purchase_url": "/v1/licenses/pricing"
+                }
+            )
     
     # Validate job_id is a valid UUID
     try:

@@ -109,10 +109,10 @@ class TestMainEndpoints:
         data = response.json()
         
         info = data["info"]
-        assert info["title"] == "Large Document Processing API"
+        assert info["title"] == "Document Processing API - Self-Hosted"
         assert "version" in info
         assert "description" in info
-        assert "API to process large Excel and PDF files" in info["description"]
+        assert "Self-hosted document processing solution" in info["description"]
 
 
 class TestHealthCheck:

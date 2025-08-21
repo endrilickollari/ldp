@@ -117,6 +117,16 @@ def read_root():
                 "my_licenses": "/v1/licenses/my-licenses",
                 "deployment_info": "/v1/licenses/deployment-info"
             },
+            "plan_endpoints": {
+                "available_plans": "/v1/plans",
+                "current_plan": "/v1/plans/current", 
+                "usage_stats": "/v1/plans/usage",
+                "upgrade": "/v1/plans/upgrade"
+            },
+            "company_endpoints": {
+                "company_info": "/v1/companies/{company_id}",
+                "company_users": "/v1/companies/{company_id}/users"
+            },
             "license_server": {
                 "url": settings.LICENSE_SERVER_URL or "Not configured",
                 "validation_required": settings.REQUIRE_LICENSE_VALIDATION

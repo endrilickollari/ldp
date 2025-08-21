@@ -77,7 +77,7 @@ class TestJobCreation:
         
         response = client.post("/v1/jobs", files=files)
         
-        assert response.status_code == 403
+        assert response.status_code == 401
 
     def test_create_job_file_size_limit_solo(self, db_session, auth_headers_solo):
         """Test file size limit for solo user (simplified test)"""
@@ -264,7 +264,7 @@ class TestJobStatus:
         
         response = client.get(f"/v1/jobs/{job_id}")
         
-        assert response.status_code == 403
+        assert response.status_code == 401
 
     def test_get_job_status_invalid_uuid(self, db_session, auth_headers_solo):
         """Test getting status with invalid job ID"""
@@ -343,7 +343,7 @@ class TestJobAuthentication:
         
         response = client.get("/v1/jobs/test-job-id", headers=headers)
         
-        assert response.status_code == 403
+        assert response.status_code == 401
 
     def test_inactive_api_key(self, db_session, solo_user, solo_user_token):
         """Test that inactive API key is rejected"""
@@ -362,4 +362,4 @@ class TestJobAuthentication:
         headers = {"X-API-Key": api_key_value}
         response = client.get("/v1/jobs/test-job-id", headers=headers)
         
-        assert response.status_code == 403
+        assert response.status_code == 401
