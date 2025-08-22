@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y \
     libpng-dev \
     libtiff-dev \
     libfreetype6-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better Docker layer caching
@@ -35,12 +36,19 @@ COPY . .
 # Create directories for uploads and logs
 RUN mkdir -p uploads logs
 
+# Initialize database with required tables and data
+RUN python init_db.py
+
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
 # Expose port
 EXPOSE 8000
+
+# Add health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/ || exit 1
 
 # Default command (can be overridden in docker-compose)
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

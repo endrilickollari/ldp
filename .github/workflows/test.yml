@@ -144,14 +144,52 @@ jobs:
 
     - name: Test Docker container
       run: |
-        # Start the container in background
-        docker run -d --name ldp-test -p 8000:8000 ldp-app:test
+        # Start the container in background with proper environment
+        docker run -d --name ldp-test -p 8000:8000 \
+          -e DATABASE_URL="sqlite:///./app.db" \
+          -e CELERY_BROKER_URL="memory://localhost/" \
+          -e CELERY_RESULT_BACKEND="cache+memory://localhost/" \
+          ldp-app:test
         
-        # Wait for the container to start
-        sleep 10
+        # Wait for container to be healthy using Docker health checks
+        echo "Waiting for container to be healthy..."
+        timeout=300  # 5 minutes timeout
+        elapsed=0
+        while [ $elapsed -lt $timeout ]; do
+          health_status=$(docker inspect --format='{{.State.Health.Status}}' ldp-test 2>/dev/null || echo "no-healthcheck")
+          
+          if [ "$health_status" = "healthy" ]; then
+            echo "Container is healthy!"
+            break
+          elif [ "$health_status" = "unhealthy" ]; then
+            echo "Container is unhealthy"
+            docker logs ldp-test
+            exit 1
+          fi
+          
+          echo "Container status: $health_status (elapsed: ${elapsed}s)"
+          sleep 10
+          elapsed=$((elapsed + 10))
+        done
         
-        # Test if the API is responding
-        curl -f http://localhost:8000/docs || exit 1
+        # Double-check with manual curl test
+        echo "Performing final API test..."
+        if ! curl -f -s --max-time 10 http://localhost:8000/ > /dev/null; then
+          echo "Final API test failed"
+          echo "Container logs:"
+          docker logs ldp-test
+          exit 1
+        fi
+        
+        echo "Testing API documentation endpoint..."
+        if ! curl -f -s --max-time 10 http://localhost:8000/docs > /dev/null; then
+          echo "API documentation endpoint failed"
+          echo "Container logs:"
+          docker logs ldp-test
+          exit 1
+        fi
+        
+        echo "Docker container test passed!"
         
         # Stop and remove the container
         docker stop ldp-test
