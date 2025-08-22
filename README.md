@@ -1,6 +1,5 @@
 # 🚀 Large Document Processing API
 
-[![Build and Publish App](https://github.com/endrilickollari/ldp/actions/workflows/build-and-publish.yml/badge.svg)](https://github.com/endrilickollari/ldp/actions/workflows/build-and-publish.yml)
 [![Simple Build](https://github.com/endrilickollari/ldp/actions/workflows/simple-build.yml/badge.svg)](https://github.com/endrilickollari/ldp/actions/workflows/simple-build.yml)
 [![Run Tests](https://github.com/endrilickollari/ldp/actions/workflows/test.yml/badge.svg)](https://github.com/endrilickollari/ldp/actions/workflows/test.yml)
 [![Quick Tests](https://github.com/endrilickollari/ldp/actions/workflows/quick-test.yml/badge.svg)](https://github.com/endrilickollari/ldp/actions/workflows/quick-test.yml)
