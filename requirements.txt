@@ -2,6 +2,8 @@
 fastapi
 uvicorn[standard]
 python-multipart
+aiofiles
+jinja2
 
 # Asynchronous Task Queue
 celery

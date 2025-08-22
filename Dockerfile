@@ -1,4 +1,23 @@
-# Use Python 3.11 slim image for smaller size
+# Multi-stage build for React frontend and Python backend
+# Stage 1: Build React frontend
+FROM node:18-alpine AS frontend-build
+
+# Set working directory for frontend
+WORKDIR /frontend
+
+# Copy package files
+COPY ui/package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy frontend source
+COPY ui/ ./
+
+# Build the React app
+RUN npm run build
+
+# Stage 2: Python backend with built frontend
 FROM python:3.11-slim
 
 # Set working directory
@@ -32,6 +51,9 @@ RUN pip install flower
 
 # Copy application code
 COPY . .
+
+# Copy built React frontend from previous stage
+COPY --from=frontend-build /frontend/build ./ui/build
 
 # Create directories for uploads and logs
 RUN mkdir -p uploads logs

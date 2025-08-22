@@ -1,9 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import jobs, auth, plans, companies
+from fastapi.staticfiles import StaticFiles
+from app.api import jobs, auth, plans, companies, ui
 from app.api import deployment_licenses as licenses
 from app.core.config import settings, DeploymentMode
 from dotenv import load_dotenv
+import os
 
 load_dotenv()
 
@@ -41,6 +43,14 @@ app.include_router(licenses.router, prefix="/v1/licenses", tags=["License Manage
 app.include_router(plans.router, prefix="/v1/plans", tags=["Plans & Usage"])
 app.include_router(companies.router, prefix="/v1/companies", tags=["Companies"])
 app.include_router(jobs.router, prefix="/v1", tags=["Jobs"])
+
+# Serve React app static files and handle client-side routing
+static_dir = "ui/build/static"
+if os.path.exists(static_dir):
+    app.mount("/live/static", StaticFiles(directory=static_dir), name="static")
+
+# Include UI router last to handle all /live/* routes
+app.include_router(ui.router, prefix="/live", tags=["UI"])
 
 @app.get("/")
 def read_root():

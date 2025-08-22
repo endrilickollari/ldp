@@ -400,41 +400,91 @@ docker run -p 8000:8000 ghcr.io/endrilickollari/ldp:latest
 
 ## 🐳 Docker Deployment
 
-### Using Docker
+### Full-Stack Application (Backend + Frontend)
+
+The application now includes a React TypeScript frontend integrated with the FastAPI backend.
+
+#### Quick Start with Docker Compose
 
 ```bash
-# Build the image
+# Clone and setup
+git clone <repository>
+cd ldp
+
+# Copy environment file
+cp .env.example .env
+# Edit .env with your configuration (API keys, etc.)
+
+# Build and start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+```
+
+#### Available Services
+
+- **Frontend**: http://localhost:8000/ - React TypeScript web app
+- **API**: http://localhost:8000/v1/ - FastAPI backend endpoints  
+- **API Docs**: http://localhost:8000/docs - Interactive API documentation
+- **Flower**: http://localhost:5555/ - Celery task monitor
+
+#### Using Docker Build Script
+
+```bash
+# Use the convenient build script
+./docker-build.sh
+
+# Or build manually
+docker-compose build --no-cache
+```
+
+### Individual Container Deployment
+
+```bash
+# Build the image (includes React frontend build)
 docker build -t ldp-app .
 
 # Run the container
 docker run -p 8000:8000 -e GOOGLE_API_KEY=your-key ldp-app
 ```
 
-### Using Docker Compose
-
-```bash
-# Start all services (API, Redis, Celery worker)
-docker-compose up
-
-# Run in background
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
-```
-
 ### Docker Configuration
 
-The Dockerfile includes:
+The multi-stage Dockerfile includes:
+
+**Stage 1 - Frontend Build:**
+- Node.js 18 Alpine for React TypeScript build
+- npm ci for reliable dependency installation
+- Production-optimized React build
+
+**Stage 2 - Backend Runtime:**
 - Python 3.11 slim base image
 - System dependencies (Tesseract OCR, Poppler utilities)
 - Python package installation with caching optimization
+- Built React frontend from Stage 1
 - Proper directory structure and permissions
-- Environment variable configuration
 - Health check endpoints
+
+### Environment Variables
+
+```bash
+# Database
+DATABASE_URL="sqlite:///./app.db"
+
+# Celery/Redis  
+CELERY_BROKER_URL="redis://redis:6379/0"
+CELERY_RESULT_BACKEND="redis://redis:6379/0"
+
+# AI Processing
+GOOGLE_API_KEY="your-google-gemini-api-key"
+
+# Authentication
+SECRET_KEY="your-jwt-secret-key"
+
+# React Frontend (optional, for custom API URL)
+REACT_APP_API_URL="http://localhost:8000"
+```
 
 ## 📊 Performance & Scalability
 

@@ -17,6 +17,16 @@ server.log
 .DS_Store
 Thumbs.db
 
+# Node.js and React build artifacts (we'll build them in Docker)
+ui/node_modules
+ui/.env.local
+ui/.env.development.local
+ui/.env.test.local
+ui/.env.production.local
+ui/npm-debug.log*
+ui/yarn-debug.log*
+ui/yarn-error.log*
+
 # Test files (optional - remove if you want to run tests in container)
 tests/
 pytest.ini
@@ -25,6 +35,11 @@ run_tests.py
 # Development files
 .env.local
 .env.development
+
+# Python virtual environment (not needed in container)
+venv/
+env/
+ENV/
 
 # Database files (keep app.db if using SQLite)
 # app.db

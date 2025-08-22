@@ -13,7 +13,8 @@ case "$1" in
         echo "Starting services..."
         docker-compose up -d
         echo "Services started! Available at:"
-        echo "  - API: http://localhost:8000"
+        echo "  - Frontend: http://localhost:8000/"
+        echo "  - API: http://localhost:8000/v1/"
         echo "  - API Docs: http://localhost:8000/docs"
         echo "  - Flower: http://localhost:5555"
         ;;
