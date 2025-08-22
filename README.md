@@ -48,6 +48,12 @@ An enterprise-grade asynchronous document processing service that leverages Goog
 - **Hierarchical Structuring**: Creates nested objects for related data
 - **Metadata Capture**: Extracts system codes, reference numbers, and technical details
 
+### 📄 **Multi-Page Document Processing**
+- **Page Range Selection**: Process specific pages (e.g., pages 5-10 of a contract)
+- **Per-Page Analysis**: Get structured data for each page individually
+- **Flexible Output Formats**: Choose between combined or per-page results
+- **Large Document Optimization**: Efficient processing of lengthy documents
+
 ## 🏛️ Architecture
 
 ```mermaid
@@ -154,11 +160,27 @@ POST /v1/jobs
 Content-Type: multipart/form-data
 ```
 
-**Request:**
+**Parameters:**
+- `file` (required): The document file to process
+- `page_start` (optional): Start page number (1-indexed, inclusive) for PDF processing
+- `page_end` (optional): End page number (1-indexed, inclusive) for PDF processing  
+- `output_format` (optional): Output format - `"combined"` (default) or `"per_page"`
+
+**Basic Request:**
 ```bash
 curl -X POST "http://localhost:8000/v1/jobs" \
   -H "Content-Type: multipart/form-data" \
   -F "file=@document.pdf"
+```
+
+**Advanced Request with Page Range:**
+```bash
+curl -X POST "http://localhost:8000/v1/jobs" \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@contract.pdf" \
+  -F "page_start=5" \
+  -F "page_end=10" \
+  -F "output_format=per_page"
 ```
 
 **Response:**
@@ -176,7 +198,7 @@ curl -X POST "http://localhost:8000/v1/jobs" \
 GET /v1/jobs/{job_id}
 ```
 
-**Response (Completed):**
+**Response (Combined Format):**
 ```json
 {
   "job_id": "550e8400-e29b-41d4-a716-446655440000",
@@ -184,10 +206,47 @@ GET /v1/jobs/{job_id}
   "stage": "Completed",
   "progress": 100,
   "result": {
+    "output_format": "combined",
     "document_type": "contract",
     "vendor": { "name": "...", "tax_id": "..." },
     "line_items": [...],
-    // ... comprehensive structured data
+    "preprocessing_metadata": {
+      "pages_processed_start": 5,
+      "pages_processed_end": 10,
+      "pages_processed_count": 6
+    }
+  }
+}
+```
+
+**Response (Per-Page Format):**
+```json
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "SUCCESS",
+  "stage": "Completed", 
+  "progress": 100,
+  "result": {
+    "output_format": "per_page",
+    "pages": [
+      {
+        "page_number": 5,
+        "extraction_method": "text",
+        "structured_data": {
+          "section": "terms_and_conditions",
+          "clauses": [...]
+        }
+      },
+      {
+        "page_number": 6,
+        "extraction_method": "ocr",
+        "structured_data": {
+          "section": "pricing_schedule", 
+          "items": [...]
+        }
+      }
+    ],
+    "preprocessing_metadata": { /* ... */ }
   }
 }
 ```

@@ -175,10 +175,15 @@ def process_document(self, file_content: bytes, original_filename: str, metadata
         # Initialize the smart preprocessor
         preprocessor = DocumentPreprocessor()
         
+        # Extract page processing parameters from metadata
+        page_start = metadata.get('page_start') if metadata else None
+        page_end = metadata.get('page_end') if metadata else None
+        output_format = metadata.get('output_format', 'combined') if metadata else 'combined'
+        
         try:
-            # Apply smart preprocessing
+            # Apply smart preprocessing with page parameters
             extracted_text, doc_metadata, intermediate_data = preprocessor.preprocess_document(
-                file_content, original_filename
+                file_content, original_filename, page_start, page_end
             )
             
             logger.info(f"Smart preprocessing completed for {original_filename}:")
@@ -191,7 +196,7 @@ def process_document(self, file_content: bytes, original_filename: str, metadata
             logger.warning(f"Smart preprocessing failed, falling back to basic processing: {e}")
             # Fallback to basic processing if smart preprocessing fails
             extracted_text, doc_metadata, intermediate_data = self._fallback_processing(
-                file_content, original_filename
+                file_content, original_filename, page_start, page_end
             )
         
         self.update_state(state='PROGRESS', meta={'stage': 'Analyzing with Gemini', 'progress': 70})
@@ -214,52 +219,121 @@ def process_document(self, file_content: bytes, original_filename: str, metadata
                 'file_format': doc_metadata.file_format,
                 'estimated_quality': doc_metadata.estimated_quality,
                 'page_count': doc_metadata.page_count,
+                'pages_processed_start': doc_metadata.pages_processed_start,
+                'pages_processed_end': doc_metadata.pages_processed_end,
+                'pages_processed_count': doc_metadata.pages_processed_count,
                 'preprocessing_applied': doc_metadata.preprocessing_applied
             }
             
-            # Generate enhanced prompt with preprocessing context
-            prompt = build_gemini_prompt(extracted_text, metadata_dict, intermediate_data)
-            
-            model = genai.GenerativeModel('gemini-1.5-pro-latest')  # type: ignore
-            response = model.generate_content(
-                prompt,
-                generation_config={"response_mime_type": "application/json"}
-            )
-            
-            self.update_state(state='PROGRESS', meta={'stage': 'Processing AI Response', 'progress': 90})
-            
-            try:
-                # Parse the JSON response
-                llm_output = json.loads(response.text)
+            if output_format == 'per_page' and 'pages' in intermediate_data:
+                # Process each page separately
+                self.update_state(state='PROGRESS', meta={'stage': 'Processing Pages Individually', 'progress': 70})
+                page_results = []
                 
-                # Enhance the result with preprocessing metadata
+                for i, page_data in enumerate(intermediate_data['pages']):
+                    page_text = page_data.get('content', '')
+                    if page_text.strip():
+                        # Generate prompt for individual page
+                        page_prompt = build_gemini_prompt(page_text, metadata_dict, {'page_data': page_data})
+                        
+                        model = genai.GenerativeModel('gemini-1.5-pro-latest')  # type: ignore
+                        page_response = model.generate_content(
+                            page_prompt,
+                            generation_config={"response_mime_type": "application/json"}
+                        )
+                        
+                        try:
+                            page_result = json.loads(page_response.text)
+                            page_results.append({
+                                "page_number": page_data['page_number'],
+                                "extraction_method": page_data['extraction_method'],
+                                "structured_data": page_result,
+                                "tables": page_data.get('tables', [])
+                            })
+                        except json.JSONDecodeError as e:
+                            logger.warning(f"Failed to parse AI response for page {page_data['page_number']}: {e}")
+                            page_results.append({
+                                "page_number": page_data['page_number'],
+                                "extraction_method": page_data['extraction_method'],
+                                "error": "Failed to parse AI response",
+                                "raw_text": page_text[:500] + "..." if len(page_text) > 500 else page_text
+                            })
+                    
+                    # Update progress
+                    progress = 70 + int((i + 1) / len(intermediate_data['pages']) * 20)
+                    self.update_state(state='PROGRESS', meta={'stage': f'Processing page {i+1}', 'progress': progress})
+                
                 structured_result = {
-                    **llm_output,
+                    "output_format": "per_page",
+                    "pages": page_results,
                     "preprocessing_metadata": {
                         "document_type": doc_metadata.document_type,
                         "file_format": doc_metadata.file_format,
                         "quality_score": doc_metadata.estimated_quality,
                         "page_count": doc_metadata.page_count,
+                        "pages_processed_start": doc_metadata.pages_processed_start,
+                        "pages_processed_end": doc_metadata.pages_processed_end,
+                        "pages_processed_count": doc_metadata.pages_processed_count,
                         "preprocessing_applied": doc_metadata.preprocessing_applied,
                         "intermediate_data_available": bool(intermediate_data)
                     }
                 }
+            else:
+                # Combined processing (original behavior)
+                # Generate enhanced prompt with preprocessing context
+                prompt = build_gemini_prompt(extracted_text, metadata_dict, intermediate_data)
                 
-                logger.info(f"Successfully processed document with {len(llm_output)} top-level fields and quality score {doc_metadata.estimated_quality:.2f}")
+                model = genai.GenerativeModel('gemini-1.5-pro-latest')  # type: ignore
+                response = model.generate_content(
+                    prompt,
+                    generation_config={"response_mime_type": "application/json"}
+                )
                 
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse LLM JSON response: {e}")
-                # Enhanced fallback with preprocessing context
-                structured_result = {
-                    "raw_response": response.text,
-                    "parsing_error": str(e),
-                    "extracted_text": extracted_text[:1000] + "..." if len(extracted_text) > 1000 else extracted_text,
-                    "preprocessing_metadata": {
-                        "document_type": doc_metadata.document_type,
-                        "quality_score": doc_metadata.estimated_quality,
-                        "preprocessing_applied": doc_metadata.preprocessing_applied
+                self.update_state(state='PROGRESS', meta={'stage': 'Processing AI Response', 'progress': 90})
+                
+                try:
+                    # Parse the JSON response
+                    llm_output = json.loads(response.text)
+                    
+                    # Enhance the result with preprocessing metadata
+                    structured_result = {
+                        "output_format": "combined",
+                        **llm_output,
+                        "preprocessing_metadata": {
+                            "document_type": doc_metadata.document_type,
+                            "file_format": doc_metadata.file_format,
+                            "quality_score": doc_metadata.estimated_quality,
+                            "page_count": doc_metadata.page_count,
+                            "pages_processed_start": doc_metadata.pages_processed_start,
+                            "pages_processed_end": doc_metadata.pages_processed_end,
+                            "pages_processed_count": doc_metadata.pages_processed_count,
+                            "preprocessing_applied": doc_metadata.preprocessing_applied,
+                            "intermediate_data_available": bool(intermediate_data)
+                        }
                     }
-                }
+                    
+                    logger.info(f"Successfully processed document with {len(llm_output)} top-level fields and quality score {doc_metadata.estimated_quality:.2f}")
+                    
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse LLM JSON response: {e}")
+                    # Enhanced fallback with preprocessing context
+                    structured_result = {
+                        "output_format": "combined",
+                        "raw_response": response.text,
+                        "parsing_error": str(e),
+                        "extracted_text": extracted_text[:1000] + "..." if len(extracted_text) > 1000 else extracted_text,
+                        "preprocessing_metadata": {
+                            "document_type": doc_metadata.document_type,
+                            "file_format": doc_metadata.file_format,
+                            "quality_score": doc_metadata.estimated_quality,
+                            "page_count": doc_metadata.page_count,
+                            "pages_processed_start": doc_metadata.pages_processed_start,
+                            "pages_processed_end": doc_metadata.pages_processed_end,
+                            "pages_processed_count": doc_metadata.pages_processed_count,
+                            "preprocessing_applied": doc_metadata.preprocessing_applied,
+                            "intermediate_data_available": bool(intermediate_data)
+                        }
+                    }
 
         final_meta = {'stage': 'Completed', 'progress': 100, 'result': structured_result}
         self.update_state(state=states.SUCCESS, meta=final_meta)
@@ -307,7 +381,7 @@ def process_document(self, file_content: bytes, original_filename: str, metadata
         self.update_state(state=states.FAILURE, meta={'exc_type': type(e).__name__, 'exc_message': str(e)})
         raise Ignore()
 
-def _fallback_processing(file_content: bytes, filename: str):
+def _fallback_processing(file_content: bytes, filename: str, page_start: Optional[int] = None, page_end: Optional[int] = None):
     """Fallback processing method using the original approach"""
     from .smart_preprocessor import DocumentMetadata
     
@@ -320,16 +394,37 @@ def _fallback_processing(file_content: bytes, filename: str):
     if filename.lower().endswith('.pdf'):
         try:
             with pdfplumber.open(file_stream) as pdf:
-                extracted_text = "\n".join(page.extract_text() for page in pdf.pages if page.extract_text())
+                # Determine page range
+                total_pages = len(pdf.pages)
+                start_page = max(1, page_start or 1)
+                end_page = min(total_pages, page_end or total_pages)
+                
+                logger.info(f"Fallback processing pages {start_page}-{end_page} of {total_pages} total pages")
+                
+                # Extract text from specified page range
+                page_texts = []
+                for page_num, page in enumerate(pdf.pages, 1):
+                    if start_page <= page_num <= end_page:
+                        page_text = page.extract_text()
+                        if page_text:
+                            page_texts.append(page_text)
+                
+                extracted_text = "\n".join(page_texts)
             logger.info("Extracted text from text-based PDF.")
         except Exception:
             from PIL import Image
             import pytesseract
             logger.warning("Failed to parse as text-based PDF, attempting OCR.")
             with pdfplumber.open(file_stream) as pdf:
-                for page in pdf.pages:
-                    img = page.to_image(resolution=300).original
-                    extracted_text += pytesseract.image_to_string(img) + "\n"
+                # Apply same page range logic for OCR
+                total_pages = len(pdf.pages)
+                start_page = max(1, page_start or 1)
+                end_page = min(total_pages, page_end or total_pages)
+                
+                for page_num, page in enumerate(pdf.pages, 1):
+                    if start_page <= page_num <= end_page:
+                        img = page.to_image(resolution=300).original
+                        extracted_text += pytesseract.image_to_string(img) + "\n"
             logger.info("Extracted text from image-based PDF using OCR.")
     elif filename.lower().endswith(('.xlsx', '.xls')):
         df = pd.read_excel(file_stream)
@@ -344,13 +439,25 @@ def _fallback_processing(file_content: bytes, filename: str):
     else:
         raise ValueError(f"Unsupported file type: {filename}")
 
+    # Determine page count for metadata
+    page_count = 1
+    if filename.lower().endswith('.pdf'):
+        try:
+            with pdfplumber.open(io.BytesIO(file_content)) as pdf:
+                page_count = len(pdf.pages)
+        except:
+            page_count = 1
+
     # Create basic metadata
     metadata = DocumentMetadata(
-        document_type='unknown',
+        document_type='pdf' if filename.lower().endswith('.pdf') else 'unknown',
         file_format=file_extension,
-        page_count=1,
+        page_count=page_count,
         estimated_quality=0.5,  # Basic fallback quality
-        preprocessing_applied=['fallback_processing']
+        preprocessing_applied=['fallback_processing'],
+        pages_processed_start=page_start,
+        pages_processed_end=page_end,
+        pages_processed_count=(page_end or page_count) - (page_start or 1) + 1 if page_start or page_end else page_count
     )
     
     # Basic intermediate data

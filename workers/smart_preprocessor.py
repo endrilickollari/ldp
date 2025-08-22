@@ -39,6 +39,10 @@ class DocumentMetadata:
     language: Optional[str] = None
     creation_date: Optional[datetime] = None
     preprocessing_applied: List[str] = field(default_factory=list)
+    # Page range processing metadata
+    pages_processed_start: Optional[int] = None
+    pages_processed_end: Optional[int] = None
+    pages_processed_count: Optional[int] = None
 
 class DocumentPreprocessor:
     """Main document preprocessing class with smart enhancement capabilities"""
@@ -54,7 +58,7 @@ class DocumentPreprocessor:
         if not HAS_OPENCV:
             logger.warning("OpenCV not available - some advanced image preprocessing features will be disabled")
         
-    def preprocess_document(self, file_content: bytes, filename: str) -> Tuple[str, DocumentMetadata, Dict[str, Any]]:
+    def preprocess_document(self, file_content: bytes, filename: str, page_start: Optional[int] = None, page_end: Optional[int] = None) -> Tuple[str, DocumentMetadata, Dict[str, Any]]:
         """
         Main preprocessing pipeline that handles different document types
         
@@ -77,7 +81,7 @@ class DocumentPreprocessor:
         
         # Route to appropriate preprocessing method
         if document_type == 'pdf':
-            text, metadata, intermediate = self._preprocess_pdf(file_content, filename, metadata)
+            text, metadata, intermediate = self._preprocess_pdf(file_content, filename, metadata, page_start, page_end)
         elif document_type == 'excel':
             text, metadata, intermediate = self._preprocess_excel(file_content, filename, metadata)
         elif document_type == 'image':
@@ -102,7 +106,7 @@ class DocumentPreprocessor:
                 return doc_type
         return 'unknown'
     
-    def _preprocess_pdf(self, file_content: bytes, filename: str, metadata: DocumentMetadata) -> Tuple[str, DocumentMetadata, Dict[str, Any]]:
+    def _preprocess_pdf(self, file_content: bytes, filename: str, metadata: DocumentMetadata, page_start: Optional[int] = None, page_end: Optional[int] = None) -> Tuple[str, DocumentMetadata, Dict[str, Any]]:
         """Preprocess PDF documents with smart text/image detection"""
         file_stream = io.BytesIO(file_content)
         extracted_text = ""
@@ -114,7 +118,29 @@ class DocumentPreprocessor:
             with pdfplumber.open(file_stream) as pdf:
                 metadata.page_count = len(pdf.pages)
                 
+                # Determine page range to process
+                start_page = max(1, page_start or 1)
+                end_page = min(metadata.page_count, page_end or metadata.page_count)
+                
+                # Validate page range
+                if start_page > metadata.page_count:
+                    raise ValueError(f"page_start ({start_page}) exceeds document page count ({metadata.page_count})")
+                
+                if end_page < start_page:
+                    raise ValueError(f"Invalid page range: {start_page}-{end_page}")
+                
+                logger.info(f"Processing pages {start_page}-{end_page} of {metadata.page_count} total pages")
+                
+                # Update metadata for actual pages being processed
+                metadata.pages_processed_start = start_page
+                metadata.pages_processed_end = end_page
+                metadata.pages_processed_count = end_page - start_page + 1
+                
                 for page_num, page in enumerate(pdf.pages, 1):
+                    # Skip pages outside the requested range
+                    if page_num < start_page or page_num > end_page:
+                        continue
+                        
                     page_text = page.extract_text()
                     page_data = {
                         "page_number": page_num,
@@ -154,8 +180,9 @@ class DocumentPreprocessor:
                     
                     pages_data.append(page_data)
                 
-                # Calculate quality estimation
-                quality_score = text_based_pages / metadata.page_count if metadata.page_count > 0 else 0
+                # Calculate quality estimation based on processed pages
+                processed_pages = metadata.pages_processed_count or metadata.page_count
+                quality_score = text_based_pages / processed_pages if processed_pages > 0 else 0
                 metadata.estimated_quality = quality_score
                 
         except Exception as e:
@@ -165,6 +192,9 @@ class DocumentPreprocessor:
         intermediate_format = {
             "document_type": "pdf",
             "total_pages": metadata.page_count,
+            "pages_processed_start": metadata.pages_processed_start,
+            "pages_processed_end": metadata.pages_processed_end,
+            "pages_processed_count": metadata.pages_processed_count,
             "text_based_pages": text_based_pages,
             "image_based_pages": image_based_pages,
             "quality_score": metadata.estimated_quality,

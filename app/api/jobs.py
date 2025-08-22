@@ -1,4 +1,4 @@
-from fastapi import APIRouter, File, UploadFile, HTTPException, status, Request, Depends
+from fastapi import APIRouter, File, UploadFile, HTTPException, status, Request, Depends, Query, Form
 from celery.result import AsyncResult
 import uuid
 import time
@@ -19,11 +19,39 @@ router = APIRouter()
 async def create_job(
     request: Request, 
     file: UploadFile = File(...),
+    page_start: Optional[int] = Form(None, description="Start page number (1-indexed, inclusive)"),
+    page_end: Optional[int] = Form(None, description="End page number (1-indexed, inclusive)"),
+    output_format: str = Form("combined", description="Output format: 'combined' or 'per_page'"),
     auth_data: Tuple[User, Optional[APIKey]] = Depends(get_user_from_api_key),
     db: Session = Depends(get_db)
 ):
     """Create a new document processing job (requires authentication and valid license)"""
     user, api_key = auth_data
+    
+    # Validate page parameters
+    if page_start is not None and page_start < 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="page_start must be >= 1"
+        )
+    
+    if page_end is not None and page_end < 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="page_end must be >= 1"
+        )
+    
+    if page_start is not None and page_end is not None and page_start > page_end:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="page_start must be <= page_end"
+        )
+    
+    if output_format not in ["combined", "per_page"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="output_format must be 'combined' or 'per_page'"
+        )
     
     # Check license manually since we need to support both JWT and API key auth
     from app.services.license_service import LicenseService
@@ -72,7 +100,10 @@ async def create_job(
         task_metadata = {
             'user_id': user.id,  # type: ignore
             'plan_type': user.plan_type.value,
-            'usage_log_id': usage_log.id
+            'usage_log_id': usage_log.id,
+            'page_start': page_start,
+            'page_end': page_end,
+            'output_format': output_format
         }
         
         task = celery_app.send_task(
