@@ -14,7 +14,7 @@ import './App.css';
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router basename="/live">
         <div className="App">
           <Navigation />
           <main>

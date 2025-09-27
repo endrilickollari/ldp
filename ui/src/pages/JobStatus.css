@@ -188,12 +188,7 @@
 }
 
 .results-preview {
-  background-color: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.5rem;
-  padding: 1rem;
-  overflow-x: auto;
-  max-height: 400px;
+  /* Styles removed to allow JsonViewer to control its own appearance */
 }
 
 .results-preview pre {

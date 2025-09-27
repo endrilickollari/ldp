@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import './JobStatus.css';
 
+import JsonViewer from '../components/JsonViewer';
+
 interface JobData {
   id: string;
   filename: string;
@@ -27,7 +29,7 @@ const JobStatus: React.FC = () => {
   useEffect(() => {
     const fetchJobStatus = async () => {
       try {
-        const response = await fetch(`/v1/jobs/${jobId}/status`, {
+        const response = await fetch(`/v1/jobs/${jobId}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
           },
@@ -39,18 +41,34 @@ const JobStatus: React.FC = () => {
 
         const data = await response.json();
         setJob(data);
+
+        // Stop polling if the job is completed or failed
+        if (data.status === 'completed' || data.status === 'failed') {
+          if (intervalId) {
+            clearInterval(intervalId);
+          }
+        }
       } catch (err: any) {
         setError(err.message);
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
+    let intervalId: NodeJS.Timeout | null = null;
     if (jobId) {
       fetchJobStatus();
-      const interval = setInterval(fetchJobStatus, 2000); // Poll every 2 seconds
-      return () => clearInterval(interval);
+      intervalId = setInterval(fetchJobStatus, 2000); // Poll every 2 seconds
     }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, [jobId]);
 
   const downloadResults = async () => {
@@ -172,8 +190,8 @@ const JobStatus: React.FC = () => {
               </div>
             )}
           </div>
+          
         </div>
-
         {job.processing_options && (
           <div className="processing-options-section">
             <h3>Processing Options</h3>
@@ -220,7 +238,7 @@ const JobStatus: React.FC = () => {
           <div className="results-section">
             <h3>Processing Results</h3>
             <div className="results-preview">
-              <pre>{JSON.stringify(job.result, null, 2)}</pre>
+              <JsonViewer data={job.result} />
             </div>
           </div>
         )}

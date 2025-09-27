@@ -68,30 +68,35 @@ class DocumentPreprocessor:
             - Intermediate structured format
         """
         file_extension = self._get_file_extension(filename)
-        document_type = self._detect_document_type(file_extension)
+        file_format_type = self._get_document_type_from_extension(file_extension)
         
-        logger.info(f"Preprocessing {document_type} document: {filename}")
+        logger.info(f"Preprocessing {file_format_type} document: {filename}")
         
         metadata = DocumentMetadata(
-            document_type=document_type,
+            document_type='unknown',  # Start with unknown, will be updated after content analysis
             file_format=file_extension,
             page_count=0,
             estimated_quality=0.0
         )
         
         # Route to appropriate preprocessing method
-        if document_type == 'pdf':
+        if file_format_type == 'pdf':
             text, metadata, intermediate = self._preprocess_pdf(file_content, filename, metadata, page_start, page_end)
-        elif document_type == 'excel':
+        elif file_format_type == 'excel':
             text, metadata, intermediate = self._preprocess_excel(file_content, filename, metadata)
-        elif document_type == 'image':
+        elif file_format_type == 'image':
             text, metadata, intermediate = self._preprocess_image(file_content, filename, metadata)
         else:
-            raise ValueError(f"Unsupported document type: {document_type}")
+            raise ValueError(f"Unsupported document type: {file_format_type}")
         
         # Apply general text cleaning
         cleaned_text = self._clean_text(text)
         metadata.preprocessing_applied.append("text_cleaning")
+        
+        # Classify document based on content
+        content_based_type = self._classify_document_by_content(cleaned_text)
+        metadata.document_type = content_based_type
+        logger.info(f"Classified document as: {content_based_type}")
         
         return cleaned_text, metadata, intermediate
     
@@ -99,13 +104,47 @@ class DocumentPreprocessor:
         """Extract file extension from filename"""
         return '.' + filename.lower().split('.')[-1] if '.' in filename else ''
     
-    def _detect_document_type(self, file_extension: str) -> str:
+    def _get_document_type_from_extension(self, file_extension: str) -> str:
         """Detect document type based on file extension"""
         for doc_type, extensions in self.supported_formats.items():
             if file_extension in extensions:
                 return doc_type
         return 'unknown'
-    
+
+    def _classify_document_by_content(self, text: str) -> str:
+        """
+        Classifies the document type based on its content using a weighted keyword scoring system.
+        """
+        text_lower = text.lower()
+        text_length = len(text_lower.split())
+
+        if text_length == 0:
+            return 'unknown'
+
+        # Define keywords with weights for different document types
+        keywords = {
+            'invoice': {'invoice': 10, 'bill to': 5, 'invoice number': 10, 'total due': 5, 'item': 2, 'quantity': 2, 'price': 2},
+            'receipt': {'receipt': 10, 'cash receipt': 10, 'payment': 5, 'total paid': 5, 'merchant': 3, 'purchase': 2},
+            'contract': {'agreement': 10, 'contract': 10, 'party': 5, 'whereas': 8, 'hereto': 8, 'terms and conditions': 5},
+            'cv': {'resume': 10, 'cv': 10, 'curriculum vitae': 10, 'experience': 5, 'education': 5, 'skills': 5, 'summary': 3},
+        }
+        
+        # Score each document type based on keyword density
+        scores = {doc_type: 0 for doc_type in keywords}
+        for doc_type, kw_list in keywords.items():
+            score = 0
+            for kw, weight in kw_list.items():
+                score += text_lower.count(kw) * weight
+            # Normalize by text length to get a density score
+            scores[doc_type] = (score / text_length) * 100
+
+        # Determine the best match, considering a minimum threshold
+        best_match = max(scores, key=scores.get)
+        if scores[best_match] > 1.0:  # Threshold to avoid false positives on short documents
+            return best_match
+        else:
+            return 'unknown'
+
     def _preprocess_pdf(self, file_content: bytes, filename: str, metadata: DocumentMetadata, page_start: Optional[int] = None, page_end: Optional[int] = None) -> Tuple[str, DocumentMetadata, Dict[str, Any]]:
         """Preprocess PDF documents with smart text/image detection"""
         file_stream = io.BytesIO(file_content)

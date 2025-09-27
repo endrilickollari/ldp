@@ -171,9 +171,20 @@ def get_job_status(
         api_key.last_used_at = datetime.utcnow()  # type: ignore
         db.commit()
     
+    # Map Celery status to frontend-friendly status
+    status_mapping = {
+        "SUCCESS": "completed",
+        "FAILURE": "failed",
+        "PENDING": "pending",
+        "STARTED": "processing",
+        "RETRY": "processing",
+        "PROGRESS": "processing",
+    }
+    current_status = status_mapping.get(task_result.status, task_result.status.lower())
+    
     response_data = {
-        "job_id": job_id,  # Return as string instead of UUID
-        "status": task_result.status,
+        "job_id": job_id,
+        "status": current_status,
     }
 
     if task_result.status == "PROGRESS":

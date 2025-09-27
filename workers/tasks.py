@@ -6,6 +6,7 @@ import logging
 import io
 import json
 import time
+import re
 import pandas as pd
 import pdfplumber
 import google.generativeai as genai  # type: ignore
@@ -23,147 +24,149 @@ try:
 except Exception as e:
     logger.error(f"Failed to configure Google AI: {e}. Please set GOOGLE_API_KEY in your .env file.")
 
-def build_gemini_prompt(text_content: str, metadata: Optional[dict] = None, intermediate_data: Optional[dict] = None) -> str:
-    """Build optimized Gemini prompt with preprocessing context"""
-    
-    # Base prompt with enhanced instructions
-    base_prompt = """
-    **Your Role:** You are an expert document analysis AI that excels at understanding and structuring any type of business document or data.
-
-    **Mission:** Analyze the provided document text and create the most comprehensive and logical JSON structure that captures ALL the information present. Think like a data analyst - what would be the most useful way to structure this data?"""
-    
-    # Add preprocessing context if available
-    context_info = ""
-    if metadata:
-        context_info += f"\n**Document Context:**\n"
-        context_info += f"- Document Type: {metadata.get('document_type', 'unknown')}\n"
-        context_info += f"- File Format: {metadata.get('file_format', 'unknown')}\n"
-        context_info += f"- Quality Score: {metadata.get('estimated_quality', 0.0):.2f}\n"
-        context_info += f"- Page Count: {metadata.get('page_count', 1)}\n"
-        
-        preprocessing_applied = metadata.get('preprocessing_applied', [])
-        if preprocessing_applied:
-            context_info += f"- Applied Preprocessing: {', '.join(preprocessing_applied)}\n"
-    
-    if intermediate_data:
-        # Add specific context based on document type
-        doc_type = intermediate_data.get('document_type', '')
-        
-        if doc_type == 'pdf':
-            text_pages = intermediate_data.get('text_based_pages', 0)
-            image_pages = intermediate_data.get('image_based_pages', 0)
-            context_info += f"- Text-based pages: {text_pages}, OCR pages: {image_pages}\n"
-            
-        elif doc_type == 'excel':
-            sheets = intermediate_data.get('total_sheets', 0)
-            context_info += f"- Total spreadsheet sheets: {sheets}\n"
-            
-        elif doc_type == 'image':
-            ocr_confidence = intermediate_data.get('ocr_confidence', 0.0)
-            context_info += f"- OCR confidence: {ocr_confidence:.2f}\n"
-
-    prompt = base_prompt + context_info + """
-
-    **Critical Instructions:**
-    1. **READ AND UNDERSTAND:** Carefully analyze the entire document to understand its type, purpose, and all the data it contains
-    2. **CREATE OPTIMAL STRUCTURE:** Design a JSON structure that:
-       - Captures EVERY piece of information from the document
-       - Uses logical, descriptive field names
-       - Groups related information into nested objects where appropriate
-       - Uses arrays for multiple similar items
-       - Preserves exact values, numbers, dates, and text as found
-    3. **BE COMPREHENSIVE:** Don't miss any detail - names, numbers, dates, addresses, codes, references, totals, line items, etc.
-    4. **USE SMART NAMING:** Use clear, descriptive field names in English (e.g., "invoice_number", "vendor_details", "line_items", "tax_breakdown")
-    5. **HANDLE DIFFERENT DOCUMENT TYPES:** Whether it's an invoice, receipt, contract, report, or any other document - adapt the structure accordingly
-    6. **RETURN ONLY JSON:** Your response must be ONLY a valid JSON object, no explanations or extra text
-
-    **Examples of Good Structuring:**
-
-    **For an Invoice:**
-    ```json
-    {{
-      "document_type": "invoice",
-      "invoice_number": "8/2025",
-      "issue_date": "12-08-2025",
-      "due_date": "11-09-2025",
-      "vendor": {{
-        "name": "Company Name",
-        "tax_id": "M31509050U",
-        "address": "Full address details"
-      }},
-      "customer": {{
-        "name": "Customer Name",
-        "tax_id": "M41703038B", 
-        "address": "Customer address",
-        "country": "ALB"
-      }},
-      "line_items": [
-        {{
-          "description": "IT Consulting & Developments",
-          "code": "ICD",
-          "unit": "Vlere monetare",
-          "quantity": 1.0,
-          "unit_price_excluding_tax": 1600.0,
-          "total_excluding_tax": 1600.0,
-          "tax_status": "Pa TVSH",
-          "total_including_tax": 1600.0
-        }}
-      ],
-      "financial_summary": {{
-        "subtotal_excluding_tax": 1600.0,
-        "total_tax": 0.0,
-        "total_including_tax": 1600.0,
-        "currency": "EUR"
-      }},
-      "currency_conversion": {{
-        "primary_currency": "EUR",
-        "secondary_currency": "LEK",
-        "exchange_rate": "1x97.23",
-        "total_in_lek": 155568.0
-      }},
-      "payment_details": {{
-        "method": "Transaksion nga llogaria",
-        "due_date": "11-09-2025"
-      }},
-      "banking_information": [
-        {{
-          "bank_name": "Banka Kombëtare Tregtare",
-          "swift_code": "NCBAALTX",
-          "iban": "422010580CLPRCLALLB",
-          "currency": "ALL"
-        }}
-      ],
-      "system_information": {{
-        "operator_id": "th137td149",
-        "location_id": "zv326lu756",
-        "nslf_code": "918132B0A4FD7C5FB51520E6AA94DDB0",
-        "nivf_code": "2228be71-e301-488a-bb8b-777a4673d60b"
-      }},
-      "tax_breakdown": [
-        {{
-          "tax_type": "Pa TVSH",
-          "taxable_amount": 1600.0,
-          "tax_amount": 0.0
-        }}
-      ]
-    }}
-    ```
-
-    **For other document types, create appropriate structures. For example:**
-    - Receipts: focus on transaction details, items, payment method
-    - Contracts: focus on parties, terms, dates, obligations
-    - Reports: focus on data categories, metrics, time periods
-    - Forms: focus on field names and values
-
-    **Document Text to Analyze:**
-    ---
-    {text_content}
-    ---
-
-    Analyze this document and create the most comprehensive JSON structure that captures all its information:
+def extract_json_from_response(text: str) -> str:
     """
+    Extracts a JSON string from a raw model response that might be
+    wrapped in markdown code blocks.
+    """
+    # Find JSON wrapped in markdown fences
+    match = re.search(r'```(json)?\s*({.*}|\[.*\])\s*```', text, re.DOTALL)
+    if match:
+        return match.group(2)
     
-    return prompt
+    # Fallback for JSON that starts at the beginning of the string but might have trailing text
+    json_start = text.find('{')
+    if json_start != -1:
+        json_end = text.rfind('}')
+        if json_end > json_start:
+            return text[json_start:json_end+1]
+            
+    return text # Return original text if no clear JSON is found
+
+def build_gemini_prompt(text_content: str, metadata: Optional[dict] = None, intermediate_data: Optional[dict] = None) -> str:
+    """
+    Builds a specialized Gemini prompt based on the detected document type.
+    """
+    doc_type = metadata.get('document_type', 'unknown') if metadata else 'unknown'
+
+    # Router to select the appropriate prompt builder
+    if 'invoice' in doc_type:
+        return build_invoice_prompt(text_content, metadata)
+    elif 'receipt' in doc_type:
+        return build_receipt_prompt(text_content, metadata)
+    elif 'contract' in doc_type:
+        return build_contract_prompt(text_content, metadata)
+    else:
+        return build_generic_prompt(text_content, metadata)
+
+def build_invoice_prompt(text_content: str, metadata: dict) -> str:
+    """Generates a highly specific prompt for extracting data from invoices."""
+    return f"""
+**Your Role:** You are an expert AI specializing in invoice data extraction.
+
+**Mission:** Analyze the invoice text and extract all key information into a structured JSON format. Pay close attention to detail.
+
+**JSON Schema for Invoices:**
+- `document_type`: "invoice"
+- `invoice_number`: The unique invoice identifier.
+- `issue_date`: The date the invoice was issued.
+- `due_date`: The date payment is due.
+- `vendor`: {{ "name": "...", "tax_id": "...", "address": "..." }}
+- `customer`: {{ "name": "...", "tax_id": "...", "address": "..." }}
+- `line_items`: [ {{ "description": "...", "quantity": ..., "unit_price": ..., "total_price": ... }} ]
+- `financial_summary`: {{ "subtotal": ..., "tax_amount": ..., "total_amount": ..., "currency": "..." }}
+- `payment_details`: {{ "method": "...", "iban": "...", "swift_code": "..." }}
+
+**Critical Instructions:**
+1.  **Extract All Fields:** Populate every field in the JSON schema. If a value is not present, use `null`.
+2.  **Data Types:** Ensure all numbers (prices, quantities) are `float` or `int`, and dates are in `YYYY-MM-DD` format.
+3.  **Line Items:** Accurately capture every single line item in the `line_items` array.
+4.  **Return ONLY JSON:** Your response must be a valid JSON object and nothing else.
+
+**Document Text to Analyze:**
+---
+{text_content}
+---
+    """
+
+def build_receipt_prompt(text_content: str, metadata: dict) -> str:
+    """Generates a highly specific prompt for extracting data from receipts."""
+    return f"""
+**Your Role:** You are a specialist AI for extracting data from sales receipts.
+
+**Mission:** Analyze the receipt text and extract all key transaction details into a structured JSON format.
+
+**JSON Schema for Receipts:**
+- `document_type`: "receipt"
+- `receipt_number`: The unique receipt identifier.
+- `transaction_date`: The date of the transaction.
+- `transaction_time`: The time of the transaction.
+- `merchant`: {{ "name": "...", "address": "...", "phone_number": "..." }}
+- `line_items`: [ {{ "description": "...", "quantity": ..., "unit_price": ..., "total_price": ... }} ]
+- `financial_summary`: {{ "subtotal": ..., "tax_amount": ..., "total_amount": ..., "currency": "..." }}
+- `payment_details`: {{ "method": "...", "card_type": "...", "last_four_digits": "..." }}
+
+**Critical Instructions:**
+1.  **Capture All Details:** Fill in all fields of the JSON schema. Use `null` for missing information.
+2.  **Data Types:** Numbers must be `float` or `int`, dates `YYYY-MM-DD`, and time `HH:MM:SS`.
+3.  **Payment Method:** Accurately identify the payment method (e.g., "Credit Card", "Cash") and any associated details.
+4.  **Return ONLY JSON:** Your response must be a valid JSON object.
+
+**Document Text to Analyze:**
+---
+{text_content}
+---
+    """
+
+def build_contract_prompt(text_content: str, metadata: dict) -> str:
+    """Generates a highly specific prompt for extracting data from contracts."""
+    return f"""
+**Your Role:** You are an AI expert in legal contract analysis.
+
+**Mission:** Analyze the contract text and extract key legal and business terms into a structured JSON format.
+
+**JSON Schema for Contracts:**
+- `document_type`: "contract"
+- `contract_title`: The title of the agreement.
+- `effective_date`: The date the contract becomes effective.
+- `termination_date`: The date the contract ends.
+- `parties`: [ {{ "name": "...", "role": "...", "address": "..." }} ]
+- `terms_and_conditions`: {{ "governing_law": "...", "confidentiality_clause": "...", "liability_clause": "..." }}
+- `payment_terms`: {{ "amount": ..., "payment_schedule": "...", "currency": "..." }}
+
+**Critical Instructions:**
+1.  **Identify Parties:** List all parties involved in the contract with their roles (e.g., "Landlord", "Tenant").
+2.  **Key Clauses:** Summarize the main points of important clauses like confidentiality and liability.
+3.  **Dates are Crucial:** Accurately extract all relevant dates.
+4.  **Return ONLY JSON:** Your response must be a valid JSON object.
+
+**Document Text to Analyze:**
+---
+{text_content}
+---
+    """
+
+def build_generic_prompt(text_content: str, metadata: dict) -> str:
+    """
+    Generates a generic but effective prompt for unknown document types.
+    """
+    return f"""
+**Your Role:** You are an expert document analysis AI.
+
+**Mission:** Analyze the document text and create a comprehensive JSON structure that captures all the information present.
+
+**Critical Instructions:**
+1.  **Infer Structure:** Determine the document's type (e.g., "report", "form", "statement") and create a logical JSON structure for it.
+2.  **Use Descriptive Names:** Create clear, descriptive field names in English.
+3.  **Capture Everything:** Do not miss any details—names, numbers, dates, addresses, etc.
+4.  **Nested Objects:** Group related information into nested JSON objects.
+5.  **Return ONLY JSON:** Your response must be a valid JSON object.
+
+**Document Text to Analyze:**
+---
+{text_content}
+---
+    """
 
 @celery_app.task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3})
 def process_document(self, file_content: bytes, original_filename: str, metadata: Optional[dict] = None):
@@ -236,14 +239,15 @@ def process_document(self, file_content: bytes, original_filename: str, metadata
                         # Generate prompt for individual page
                         page_prompt = build_gemini_prompt(page_text, metadata_dict, {'page_data': page_data})
                         
-                        model = genai.GenerativeModel('gemini-1.5-pro-latest')  # type: ignore
+                        model = genai.GenerativeModel('gemini-2.5-flash-lite')  # type: ignore
                         page_response = model.generate_content(
                             page_prompt,
                             generation_config={"response_mime_type": "application/json"}
                         )
                         
                         try:
-                            page_result = json.loads(page_response.text)
+                            cleaned_json = extract_json_from_response(page_response.text)
+                            page_result = json.loads(cleaned_json)
                             page_results.append({
                                 "page_number": page_data['page_number'],
                                 "extraction_method": page_data['extraction_method'],
@@ -283,7 +287,7 @@ def process_document(self, file_content: bytes, original_filename: str, metadata
                 # Generate enhanced prompt with preprocessing context
                 prompt = build_gemini_prompt(extracted_text, metadata_dict, intermediate_data)
                 
-                model = genai.GenerativeModel('gemini-1.5-pro-latest')  # type: ignore
+                model = genai.GenerativeModel('gemini-2.5-flash-lite')  # type: ignore
                 response = model.generate_content(
                     prompt,
                     generation_config={"response_mime_type": "application/json"}
@@ -293,7 +297,8 @@ def process_document(self, file_content: bytes, original_filename: str, metadata
                 
                 try:
                     # Parse the JSON response
-                    llm_output = json.loads(response.text)
+                    cleaned_json = extract_json_from_response(response.text)
+                    llm_output = json.loads(cleaned_json)
                     
                     # Enhance the result with preprocessing metadata
                     structured_result = {

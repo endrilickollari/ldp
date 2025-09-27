@@ -1,0 +1,100 @@
+.editable-table-container {
+  margin-top: 1rem;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.editable-table {
+  width: 100%;
+  min-width: 600px;
+  border-collapse: collapse;
+  background-color: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.editable-table th,
+.editable-table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+  word-wrap: break-word;
+  max-width: 300px;
+}
+
+.editable-table th:first-child,
+.editable-table td:first-child {
+  width: 30%;
+  font-weight: 500;
+}
+
+.editable-table th:last-child,
+.editable-table td:last-child {
+  width: 70%;
+}
+
+.editable-table th {
+  background-color: #f9fafb;
+  font-weight: 600;
+  color: #374151;
+}
+
+.editable-table td {
+  color: #1f2937;
+}
+
+.editable-input,
+.editable-textarea {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.editable-input:focus,
+.editable-textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.editable-textarea {
+  min-height: 80px;
+  resize: vertical;
+  white-space: pre-wrap;
+  font-family: 'Fira Code', 'Courier New', Courier, monospace;
+  font-size: 0.8rem;
+}
+
+.editable-table-actions {
+  margin-top: 1.5rem;
+  text-align: right;
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  .editable-table-container {
+    border-radius: 0;
+    margin: 1rem -1rem 0 -1rem;
+  }
+  
+  .editable-table {
+    min-width: 500px;
+    border-radius: 0;
+  }
+  
+  .editable-table th,
+  .editable-table td {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+  }
+  
+  .editable-input,
+  .editable-textarea {
+    font-size: 0.875rem;
+  }
+}

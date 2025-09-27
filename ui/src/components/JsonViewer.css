@@ -1,0 +1,222 @@
+.json-viewer-container {
+  background-color: #ffffff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 15px;
+  margin-top: 1rem;
+  font-family: Consolas, Monaco, 'Courier New', monospace;
+}
+
+.json-viewer {
+  font-family: Consolas, Monaco, 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #000;
+  text-align: left;
+  white-space: pre;
+  overflow-x: auto;
+  width: 100%;
+  padding: 5px;
+}
+
+.json-entry {
+  display: block;
+  margin: 0;
+  padding: 0;
+  line-height: 1.4;
+  white-space: pre;
+}
+
+.json-key {
+  color: #800080; /* Purple for keys */
+  font-weight: normal;
+}
+
+.json-value-string {
+  color: #008000; /* Green for strings */
+}
+
+.json-value-number {
+  color: #0000FF; /* Blue for numbers */
+}
+
+.json-value-boolean {
+  color: #0000FF; /* Blue for booleans */
+}
+
+.json-value-object {
+  color: #000;
+}
+
+.json-bracket {
+  color: #000;
+  font-weight: normal;
+}
+
+.json-toggler {
+  cursor: pointer;
+  margin-right: 5px;
+  display: inline-block;
+  width: 12px;
+  text-align: center;
+  color: #000;
+  font-weight: normal;
+  font-size: 12px;
+}
+
+.json-toggler:hover {
+  background-color: #f0f0f0;
+}
+
+.json-nested {
+  margin-left: 0;
+  position: relative;
+}
+
+.json-placeholder {
+  cursor: pointer;
+  color: #999;
+  font-style: italic;
+}
+
+.json-value-null {
+  color: #808080;
+  font-style: italic;
+}
+
+.json-object {
+  display: block;
+  width: 100%;
+}
+
+.json-closing-bracket {
+  display: block;
+}
+
+.json-indent {
+  white-space: pre;
+  font-family: inherit;
+}
+
+.json-viewer-actions {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 1.5rem;
+}
+
+.json-viewer-controls {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.json-viewer-main-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.json-viewer-button {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.json-viewer-button:hover {
+  transform: translateY(-1px);
+}
+
+.confirm-button {
+  background-color: #28a745;
+  color: white;
+}
+
+.confirm-button:hover {
+  background-color: #218838;
+}
+
+.review-button {
+  background-color: #007bff;
+  color: white;
+}
+
+.review-button:hover {
+  background-color: #0056b3;
+}
+
+.save-button {
+  background-color: #ffc107;
+  color: #212529;
+}
+
+.save-button:hover {
+  background-color: #e0a800;
+}
+
+.expand-button {
+  background-color: #10b981;
+  color: white;
+  font-size: 0.875rem;
+}
+
+.expand-button:hover {
+  background-color: #059669;
+}
+
+.collapse-button {
+  background-color: #f59e0b;
+  color: white;
+  font-size: 0.875rem;
+}
+
+.collapse-button:hover {
+  background-color: #d97706;
+}
+
+.copy-button {
+  background-color: #6366f1;
+  color: white;
+  font-size: 0.875rem;
+}
+
+.copy-button:hover {
+  background-color: #4f46e5;
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  .json-viewer-container {
+    padding: 1rem;
+    margin: 1rem 0;
+  }
+  
+  .json-viewer {
+    font-size: 0.8rem;
+  }
+  
+  .json-viewer-actions {
+    gap: 0.75rem;
+  }
+  
+  .json-viewer-controls,
+  .json-viewer-main-actions {
+    gap: 0.5rem;
+  }
+  
+  .json-viewer-button {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+  }
+  
+  .expand-button,
+  .collapse-button,
+  .copy-button {
+    font-size: 0.8rem;
+  }
+}
