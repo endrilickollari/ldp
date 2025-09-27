@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useRef } from 'react';
+import DragDropUploader from '../components/DragDropUploader';
+import JobQueueMonitor, { JobQueueMonitorRef } from '../components/JobQueueMonitor';
 import './Upload.css';
 
 interface UploadFormData {
@@ -18,10 +19,9 @@ const Upload: React.FC = () => {
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const navigate = useNavigate();
+  const jobQueueRef = useRef<JobQueueMonitorRef>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
+  const handleFileChange = (file: File | null) => {
     setFormData({ ...formData, file });
   };
 
@@ -41,11 +41,6 @@ const Upload: React.FC = () => {
 
     if (!formData.file) {
       setError('Please select a file to upload');
-      return;
-    }
-
-    if (formData.file.type !== 'application/pdf') {
-      setError('Please select a PDF file');
       return;
     }
 
@@ -78,7 +73,19 @@ const Upload: React.FC = () => {
       }
 
       const result = await response.json();
-      navigate(`/job/${result.job_id}`);
+      
+      // Add job to the queue monitor instead of navigating immediately
+      if (jobQueueRef.current && formData.file) {
+        jobQueueRef.current.addJob(result.job_id, formData.file.name);
+      }
+      
+      // Clear the form after successful upload
+      setFormData({
+        file: null,
+        page_start: '',
+        page_end: '',
+        output_format: 'combined',
+      });
     } catch (err: any) {
       setError(err.message || 'Upload failed');
     } finally {
@@ -103,37 +110,12 @@ const Upload: React.FC = () => {
 
           <div className="form-section">
             <h3>Document Selection</h3>
-            <div className="file-upload-area">
-              <input
-                type="file"
-                id="file"
-                accept=".pdf"
-                onChange={handleFileChange}
-                disabled={isLoading}
-                className="file-input"
-              />
-              <label htmlFor="file" className="file-upload-label">
-                {formData.file ? (
-                  <div className="file-selected">
-                    <span className="file-icon">📄</span>
-                    <div className="file-info">
-                      <div className="file-name">{formData.file.name}</div>
-                      <div className="file-size">
-                        {(formData.file.size / 1024 / 1024).toFixed(2)} MB
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="file-placeholder">
-                    <span className="upload-icon">📤</span>
-                    <div className="upload-text">
-                      <div className="upload-title">Click to upload PDF</div>
-                      <div className="upload-subtitle">or drag and drop</div>
-                    </div>
-                  </div>
-                )}
-              </label>
-            </div>
+            <DragDropUploader
+              file={formData.file}
+              onFileChange={handleFileChange}
+              disabled={isLoading}
+              acceptedTypes={['.pdf']}
+            />
           </div>
 
           <div className="form-section">
@@ -198,6 +180,16 @@ const Upload: React.FC = () => {
             {isLoading ? 'Processing...' : 'Start Processing'}
           </button>
         </form>
+
+        {/* Job Queue Monitor */}
+        <JobQueueMonitor 
+          ref={jobQueueRef}
+          onJobComplete={(jobId) => {
+            // Optional: Show notification or navigate to job details
+            console.log(`Job ${jobId} completed`);
+          }}
+          maxDisplayJobs={5}
+        />
       </div>
     </div>
   );
